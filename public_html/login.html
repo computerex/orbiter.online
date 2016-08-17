@@ -1,0 +1,48 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Orbiter Online: Login</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.1/css/materialize.min.css">
+		  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	</head>
+	<body style="background:url('images/login.jpg');background-size:cover;" ng-app="app" ng-controller="loginController">
+		<nav>
+		    <div class="nav-wrapper teal">
+			    <a href="#" class="brand-logo center">Orbiter Online</a>
+			    <ul id="nav-mobile" class="right hide-on-med-and-down">
+			    </ul>
+		    </div>
+			</nav>
+		<div class="container white-text">
+			<h1>Orbiter Online Login</h1>
+			<div class="row">
+				<div class="input-field col s12 ">
+					<input type="text" ng-model="txtUserName" placeholder = "username" id="username" />
+					<label for="username">Username</label>
+				</div>
+			</div>
+			<div class="row">
+				<div class="input-field col s12 ">
+					<input ng-enter="login()" type="password" ng-model="txtPassword" placeholder = "password" id="password" />
+					<label for="password">Password</label>
+				</div>
+			</div>
+			<div class="row">
+				<div class="input-field col s12">
+        			<button ng-click="login()" class="waves-effect waves-light btn"><i class="material-icons left">done</i>Login</button>
+        		</div>
+			</div>
+        </div>
+		<!-- Scripts -->
+		<script src="assets/js/jquery.min.js"></script>
+		<script src="assets/js/jquery.scrolly.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.1/js/materialize.min.js"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+		<script src="assets/js/app/login.js"></script>
+	</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Orbiter Online: Base</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.1/css/materialize.min.css">
+		  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	</head>
+	<body ng-app="app" ng-controller="baseController">
+		<nav>
+		    <div class="nav-wrapper teal">
+			    <a href="/dash.html" class="brand-logo center">Orbiter Online</a>
+			    <ul id="nav-mobile" class="right hide-on-med-and-down">
+			    </ul>
+		    </div>
+			</nav>
+		<div class="container teal-text">
+			<h3>{{baseInfo.name}}  <small>({{baseInfo.planet}})</small></h3>
+	        <hr />
+	        <div classs="row">
+	        	<div class="row">
+		        	<div class="col s12 flow-text">
+		        		<pre>
+		        		{{baseInfo.basedesc}}
+		        		</pre>
+		        	</div>
+	        	</div>
+	        	<div class="row">
+	        		<div class="col s12">
+	        			<a target="_blank" ng-href="{{baseInfo.baseurl}}">Additional Information</a>
+	        		</div>
+	        		<div class="col s12">
+	        			<h5>Created by {{userInfo.username}} on {{baseInfo.created}}</h5>
+	        		</div>
+	        	</div>
+	        	<div class="row">
+	        		<h1>Visitors</h1>
+	        		<div class="col s12">
+	        			<div class="row" ng-repeat="visitor in visitors">
+	        				<div class="col s12 flow-text">
+	        					{{visitor.username}} visited {{baseInfo.name}} at {{visitor.created}}
+	        				</div>
+	        			</div>
+	        		</div>
+	        	</div>
+	        </div>
+	        <footer>
+				<div class="row">
+					<div class="col s12">
+						<h1>Orbiter Online</h1>
+					</div>
+				</div>
+			</footer>
+	    </div>
+		<!-- Scripts -->
+		<script src="assets/js/jquery.min.js"></script>
+		<script src="assets/js/jquery.scrolly.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.1/js/materialize.min.js"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+		<script type="text/javascript" src="assets/js/app/common.js"></script>
+		<script src="assets/js/app/base.js"></script>
+	</body>
+</html>

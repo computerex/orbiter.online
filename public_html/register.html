@@ -1,0 +1,64 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Orbiter Online: Register</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.1/css/materialize.min.css">
+		  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	</head>
+	<body style="background:url('images/register.jpg');background-size:cover;" ng-app="app" ng-controller="registerController">
+		<nav>
+		    <div class="nav-wrapper teal">
+			    <a href="#" class="brand-logo center">Orbiter Online</a>
+			    <ul id="nav-mobile" class="right hide-on-med-and-down">
+			    </ul>
+		    </div>
+			</nav>
+		<div class="container white-text">
+			<h2 Register for Orbiter Online</h1>
+			<h6>Benefits of registering: </h6>
+			<ul>
+				<li style="background:transparent !important;"><i class="material-icons left">label_outline</i>Once you register, you can login multiplayer!</li> <br />
+				<li style="background:transparent !important;"><i class="material-icons left">label_outline</i>Registering allows you to submit your own bases to Orbiter Online. These bases are automatically synchronized to all Orbiter Online players. Submitting a base is very easy.</li> <br />
+				<li style="background:transparent !important;"><i class="material-icons left">label_outline</i>Base submitters will become base owners, and they will receive revenue generated from players staying at their base.</li><br />
+				<li style="background:transparent !important;"><i class="material-icons left">label_outline</i>It's quick, easy and free!</li> <br />
+			</ul>
+			<hr />
+        	<div class="row white-text">
+        		<div class="col s12">
+        			<div class="row">
+        				<div class="input-field col s6">
+        					<input id="userName" placeholder="username" type="text" ng-model="txtUserName" />
+        					<label for="userName">Username</label>
+        				</div>
+        				<div class="input-field col s6">
+        					<input id="email" placeholder="email" type="text" ng-model="txtEmail" />
+        					<label for="email">Email</label>
+        				</div>
+        			</div>
+        		</div>
+        		<div class="input-field col s12">
+        			<input id="password" type="password" placeholder="password" ng-model="txtPassword" />
+        			<label for="password">Password</label>
+        		</div>
+        		<div class="input-field col s12" ng-enter="register()">
+        			<input id="confirmpassword" type="password" placeholder="confirm password" ng-model="txtPasswordConfirm" />
+        			<label for="confirmpassword">Confirm Password</label>
+        		</div>
+        		<div class="input-field col s12">
+        			<button ng-click="register()" class="waves-effect waves-light btn"><i class="material-icons left">done</i>Register</button>
+        		</div>
+        	</div>
+        </div>
+		<!-- Scripts -->
+		<script src="assets/js/jquery.min.js"></script>
+		<script src="assets/js/jquery.scrolly.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.1/js/materialize.min.js"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+		<script src="assets/js/app/register.js"></script>
+	</body>
+</html>

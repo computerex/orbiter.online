@@ -1,0 +1,178 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Orbiter Online: Dash</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.1/css/materialize.min.css">
+		  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	</head>
+	<body ng-app="app" ng-controller="dashController">
+		<nav>
+		    <div class="nav-wrapper teal">
+			    <a href="#" class="brand-logo center">Orbiter Online</a>
+			    <ul id="nav-mobile" class="right hide-on-med-and-down">
+			    </ul>
+		    </div>
+			</nav>
+		<div class="container teal-text">
+			<h3>Welcome, {{user.username}}</h3>
+        
+	        <div class="row" ng-show="displayIntro">
+	        	<div class="col s12">
+	        		<div class="card">
+					    <div class="card-content">
+					    	<h4>Welcome to Orbiter Online!<a ng-click="toggleIntro()" style="cursor:pointer;"><span class="right"><i class="material-icons">done_all</i></span></a></h4>
+					    	<p class="flow-text">
+					    		We are sorry things are looking a bit...sparse. This is a <strong>"pre-alpha"</strong> release, afterall! Fear not, there are still a couple interesting things to check out. Here are the instructions to setup a clean orbiter installation with Orbiter Online: 
+
+					    		<ul class="flow-text">
+					    			<li>1. Download and install Orbiter 2010 Patch 1 from here (one or the other): <br /><a target="_blank" href="http://orbit.medphys.ucl.ac.uk/zipinstall.html">zip version</a> <br />
+					    			<a target="_blank" href="http://orbit.medphys.ucl.ac.uk/msiinstall.html">msi version</a></li>
+					    			<li>2. Now we need to install Dan Step's universal cargo mod. This is currently used for AI traffic, in the future it will be used for cargo management. 
+						    			<ul>
+						    				<li><a href="http://orbiter.dansteph.com/forum/index.php?page=download" target="_blank">Dan Steph's UCGO</a></li>
+						    			</ul>
+					    			</li>
+					    			<li>3. Download Orbiter Online package from <a href="/orbiteronline.zip">here</a>. Extract the zip file into Orbiter's root directory.</li>
+					    			<li>4. Now we must update the <strong>orbiter/orbiter.online.cfg</strong> file with our login credentials. Open the file with notepad or another text editor. The first line denotes your username ({{user.username}}). The second line your password.</li> Make the changes, save the file. 
+					    			<li>5. Activate the orbiter.online plugin-in under the launchpad. <br />
+					    			<img src="http://i.imgur.com/lqCDaml.png" /> <br />
+					    			If the plug-in does not appear under the list, make sure the files were extracted correctly. There should be a <strong>libcurl.dll</strong> file in the <strong>Modules</strong> folder, and a <strong>orbiter.online.dll</strong> file in the <strong>Modules/Plugin</strong> folder. If the files are not there, please try to install Orbiter Online again by re-extracting the zip file. </li>
+					    			<li> 6. Launch a scenario! The included Orbiter Online scenario is configured to spawn a Deltaglider on KSC runway. The scenario runs in <strong>real-time</strong>, in hopes of decreasing the time difference between players. You can launch any scenario you'd like, and sync to any player using the <strong>Orbiter Online MFD</strong>, but jumping too far into the future or too far into the past can cause physics issues!<br />
+					    				<img src="http://i.imgur.com/tO3qlQm.png" /><img style="width:55%;" src="images/orp.jpg" /> <br />
+					    				For now, you can dual-triple client, by signing up with multiple usernames and orbiter installations. It is important to have 1 separate Orbiter installation per client.  
+					    			</li>
+					    			<li>
+					    			 7. When you enter the scenario, Orbiter Online populates Orbiter with bases submitted by players. Online players are spawned in the game world. Players disconnected for over 15 seconds are despawned. There are no controls placed on time acceleration. Just know, the greater the time difference, the greater the positional error. Use the <strong>Orbiter Online MFD</strong> to sync time with online players. 
+					    			</li>
+					    		</ul>
+					    		<strong>Additional notes:</strong> <br />
+					    		Below, you can add new bases or view existing ones. 
+					    	</p>
+					    </div>
+					</div>
+	        	</div>
+	        </div>
+	        <hr />
+	        <div class="col s12">
+	        	<h5>Balance: ${{userInfo.balance}}</h5>
+	        	<strong>Recent Transactions</strong>
+	        	<div class="row">
+	        		<div class="col s4">
+	        			balance change
+	        		</div>
+	        		<div class="col s4">
+	        			name
+	        		</div>
+	        		<div class="col s4">
+	        			date
+	        		</div>
+	        	</div>
+	        	<div class="row" ng-repeat="tran in transactions">
+	        		<div class="col s4">
+	        		${{tran.balance_change}}
+	        		</div>
+	        		<div class="col s4">
+	        		{{tran.name}}
+	        		</div>
+	        		<div class="col s4">
+	        		{{tran.created}}
+	        		</div>
+	        	</div>
+	        </div>
+	        <div class="col s12">
+	        	<h5>Add a new base</h5>
+	        	<div class="row">
+	        		<div class="input-field col s4">
+	        			<input type="text" id="name" placeholder = "Name" ng-model="txtName" />
+	        			<label for="name">Name</label>
+	        		</div>
+	        		<div class="input-field col s4">
+	        			<input type="text" id="lon" placeholder = "longitude" ng-model="txtLon" />
+	        			<label for="lon">Longitude</label>
+	        		</div>
+	        		<div class="input-field col s4">
+	        			<input type="text" id="lat" placeholder = "latitude" ng-model="txtLat" />
+	        			<label for="lat">Latitude</label>
+	        		</div>
+	        	</div>
+	        	<div class="row">
+	        		<div class="input-field col s12">
+	        			<textarea ng-model="txtDesc" class="materialize-textarea" placeholder="base description" id="desc"></textarea>
+	        			<label for="desc">Base description</label>
+	        		</div>
+	        	</div>
+	        	<div class="row">
+	        		<div class="col s12">
+	        			<strong>Are you a base developer, and is this your base? Does an add-on exist for this base? If it does, enter the URL of where the add-on is hosted (eg. Orbithangar).</strong>
+	        		</div>
+	        		<div class="input-field col s12">
+	        			<input type="text" ng-model="txtBaseUrl" id="url" placeholder="base URL (optional)" />
+	        			<label id="url">Base URL (optional)</label>
+	        		</div>
+	        	</div>
+	        	<div class="row">
+	        		<div class="input-field col s6 browser-default">
+	        			<select class="browser-default" ng-model="txtPlanet">
+	        				<option ng-repeat="body in bodies" ng-value="body.name">{{body.name}}</option>
+	        			</select>
+	        		</div>
+	        		<div class="input-field col s6">
+	        			<button class="waves-effect waves-light btn" ng-click="addbase()">Add Base</button>
+	        		</div>
+	        	</div>
+	        </div>
+	        <div class="col s12">
+	        	<h5>Current Bases</h5>
+	        	<br />
+	        	<div class="row">
+	        		<div class="col s3">
+	        			Name
+	        		</div>
+	        		<div class="col s3">
+	        			Lon
+	        		</div>
+	        		<div class="col s3">
+	        			Lat
+	        		</div>
+	        		<div class="col s3">
+	        			Planet
+	        		</div>
+	        	</div>
+	        	<hr />
+	        	<div class="row" ng-repeat="base in bases">
+	        		<div class="col s3">
+	        			<a target="_blank" ng-href="/base.html?id={{base.id}}">{{base.name}}</a>
+	        		</div>
+	        		<div class="col s3">
+	        			{{base.lon}}
+	        		</div>
+	        		<div class="col s3">
+	        			{{base.lat}}
+	        		</div>
+	        		<div class="col s3">
+	        			{{base.planet}}
+	        		</div>
+	        	</div>
+	        </div>
+	        <footer style="min-height:300px;">
+				<div class="row">
+					<div class="col s12">
+						<h1>Orbiter Online</h1>
+					</div>
+				</div>
+			</footer>
+	    </div>
+		<!-- Scripts -->
+		<script src="assets/js/jquery.min.js"></script>
+		<script src="assets/js/jquery.scrolly.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.1/js/materialize.min.js"></script>
+		<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+		<script type="text/javascript" src="assets/js/app/common.js"></script>
+		<script src="assets/js/app/dash.js"></script>
+	</body>
+</html>
