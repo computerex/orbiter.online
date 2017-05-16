@@ -10,9 +10,9 @@
   "author": "",
   "license": "BSD-2-Clause",
   "dependencies": {
+    "body-parser": "^1.17.1",
     "express": "~4.13.3",
-    "express-session": "^1.12.1",
-    "session-file-store": "0.0.21",
-    "ws": "~0.8.0"
+    "node-uuid": "^1.4.8",
+    "uuid": "^3.0.1"
   }
 }
