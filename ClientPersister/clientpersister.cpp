@@ -24,7 +24,7 @@ public:
 	bool landed;
 	string refplanet, name, className;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
-		retro, hover, main, mjd, accx, accy, accz, elevator, rudder, aileron;
+		retro, hover, main, mjd, accx, accy, accz;
 };
 
 map<string, SimpleVesselState> vesselList, serverVesselList;
@@ -107,9 +107,6 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 			s.accx = d[i]["accx"].GetDouble();
 			s.accy = d[i]["accy"].GetDouble();
 			s.accz = d[i]["accz"].GetDouble();
-			s.elevator = d[i]["elevator"].GetDouble();
-			s.rudder = d[i]["rudder"].GetDouble();
-			s.aileron = d[i]["aileron"].GetDouble();
 			newVesselList[name] = s;
 		}
 	}
@@ -178,9 +175,6 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 		v->SetThrusterGroupLevel(THGROUP_MAIN, state.main);
 		v->SetThrusterGroupLevel(THGROUP_HOVER, state.hover);
 		v->SetThrusterGroupLevel(THGROUP_RETRO, state.retro);
-		v->SetControlSurfaceLevel(AIRCTRL_ELEVATOR, state.elevator);
-		v->SetControlSurfaceLevel(AIRCTRL_RUDDER, state.rudder);
-		v->SetControlSurfaceLevel(AIRCTRL_AILERON, state.aileron);
 	}
 	if (didSlowUpdate) {
 		slowUpdateLastsyst = syst;
@@ -190,7 +184,7 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 void proc()
 {
 	while (true) {
-		string resp = curl_get("http://localhost:5000/tele");
+		string resp = curl_get("http://orbiter.world/tele");
 		map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
 
 		stateLock.lock();

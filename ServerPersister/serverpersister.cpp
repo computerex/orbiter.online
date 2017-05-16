@@ -24,7 +24,7 @@ public:
 	bool landed;
 	string refplanet, name, className;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
-		retro, hover, main, mjd, accx, accy, accz, elevator, rudder, aileron;
+		retro, hover, main, mjd, accx, accy, accz;
 };
 
 map<string, SimpleVesselState> vesselList, serverVesselList;
@@ -107,9 +107,6 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 			s.accx = d[i]["accx"].GetDouble();
 			s.accy = d[i]["accy"].GetDouble();
 			s.accz = d[i]["accz"].GetDouble();
-			s.elevator = d[i]["elevator"].GetDouble();
-			s.rudder = d[i]["rudder"].GetDouble();
-			s.aileron = d[i]["aileron"].GetDouble();
 			newVesselList[name] = s;
 		}
 	}
@@ -151,9 +148,6 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		v.AddMember("accx", s.accx, a);
 		v.AddMember("accy", s.accy, a);
 		v.AddMember("accz", s.accz, a);
-		v.AddMember("elevator", s.elevator, a);
-		v.AddMember("rudder", s.rudder, a);
-		v.AddMember("aileron", s.aileron, a);
 		valr = Value(s.className.c_str(), a);
 		v.AddMember("className", valr, a);
 		valr = Value(s.name.c_str(), a);
@@ -174,7 +168,7 @@ void proc()
 		map<string, SimpleVesselState> vesselStates = vesselList;
 		stateLock.unlock();
 		string teleStr = getTele(vesselStates);
-		string resp = curl_post("http://localhost:5000/posttele?pid=" + persistID, teleStr);
+		string resp = curl_post("http://orbiter.world/posttele?pid=" + persistID, teleStr);
 		map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
 
 		stateLock.lock();
@@ -199,14 +193,29 @@ DLLCLBK void ExitModule(HINSTANCE hDLL)
 
 DLLCLBK void opcCloseRenderViewport()
 {
-	curl_post("http://localhost:5000/persister/exit?pid=" + persistID, "{}");
+	//curl_post("http://orbiter.world/persister/exit?pid=" + persistID, "{}");
+}
+
+string getPersistIDFromDisk() {
+	FILE* file = fopen("persistid", "r");
+	if (file == 0) return "";
+	char buffer[512];
+	fgets(buffer, 512, file);
+	fclose(file);
+	return buffer;
 }
 
 bool first = false;
 DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 	if (!first) {
 		first = true;
-		persistID = curl_get("http://localhost:5000/persister/register");
+		persistID = getPersistIDFromDisk();
+		if (persistID == "") {
+			persistID = curl_get("http://orbiter.world/persister/register");
+			FILE* persistFile = fopen("persistid", "w");
+			fputs(persistID.c_str(), persistFile);
+			fclose(persistFile);
+		}
 		serverThread = new thread(proc);
 	}
 	double syst = oapiGetSysTime();
@@ -250,9 +259,6 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			s.rvelx = vs.rvel.x;
 			s.rvely = vs.rvel.y;
 			s.rvelz = vs.rvel.z;
-			s.elevator = v->GetControlSurfaceLevel(AIRCTRL_ELEVATOR);
-			s.rudder = v->GetControlSurfaceLevel(AIRCTRL_RUDDER);
-			s.aileron = v->GetControlSurfaceLevel(AIRCTRL_AILERON);
 			VECTOR3 force, acc;
 			v->GetForceVector(force);
 			acc = force / v->GetMass();
@@ -320,9 +326,6 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 				state.accx = acc.x;
 				state.accy = acc.y;
 				state.accz = acc.z;
-				state.elevator = v->GetControlSurfaceLevel(AIRCTRL_ELEVATOR);
-				state.rudder = v->GetControlSurfaceLevel(AIRCTRL_RUDDER);
-				state.aileron = v->GetControlSurfaceLevel(AIRCTRL_AILERON);
 			}
 			vesselList[state.name] = state;
 		}

@@ -40,21 +40,25 @@ app.get('/tele', function(req, res){
 app.get('/persister/register', function(req, res) {
   var pid = uuid();
   persisters[pid] = {};
-  console.log(pid);
   res.send(pid, 200);
 });
 
 app.post('/persist', function(req, res){
   console.log("current persisters: ");
   console.log(persisters);
-  var keys = Object.keys(persisters);
-  console.log(keys);
-  if (keys.length < 1) {
-    console.log("we have no persisters :(");
-    res.send({}, 200);
-    return;
+  var persisterId;
+  if (req.query.pid != null && persisters[req.query.pid] != null) {
+    persisterId = req.query.pid;
   }
-  var pid = keys[0];
+  else {
+    var keys = Object.keys(persisters);
+    if (keys.length < 1) {
+      console.log("we have no persisters :(");
+      res.send({}, 200);
+      return;
+    }
+    persisterId = keys[0];
+  }
   newVessels[pid] = req.body;
   res.send({}, 200);
 });

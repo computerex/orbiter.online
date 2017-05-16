@@ -30,6 +30,7 @@ DWORD l_tick_count = GetTickCount();
 CRITICAL_SECTION mjdlock;
 bool first = false;
 std::thread *t1;
+string persistId = "";
 
 void mjd_sync() {
 	while (true) {
@@ -47,6 +48,16 @@ void mjd_sync() {
 	}
 }
 
+
+string getPersistIDFromDisk() {
+	FILE* file = fopen("persistid", "r");
+	if (file == 0) return "";
+	char buffer[512];
+	fgets(buffer, 512, file);
+	fclose(file);
+	return buffer;
+}
+
 DLLCLBK void InitModule (HINSTANCE hDLL)
 {
 	// OICOM initialization
@@ -60,7 +71,13 @@ DLLCLBK void InitModule (HINSTANCE hDLL)
 	spec.context = NULL;
 	spec.msgproc = MJDControllerMFD::MsgProc;
 	mode = oapiRegisterMFDMode (spec);
-	
+	persistId = getPersistIDFromDisk();
+	if (persistId == "") {
+		persistId = curl_get("http://orbiter.world/persister/register");
+		FILE* persistFile = fopen("persistid", "w");
+		fputs(persistId.c_str(), persistFile);
+		fclose(persistFile);
+	}
 }
 
 class SimpleVesselState
@@ -69,7 +86,7 @@ public:
 	bool landed;
 	string refplanet, name, className;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
-		retro, hover, main, mjd, accx, accy, accz, elevator, rudder, aileron;
+		retro, hover, main, mjd, accx, accy, accz;
 };
 
 DLLCLBK void ExitModule (HINSTANCE hDLL)
@@ -117,9 +134,6 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		v.AddMember("accx", s.accx, a);
 		v.AddMember("accy", s.accy, a);
 		v.AddMember("accz", s.accz, a);
-		v.AddMember("elevator", s.elevator, a);
-		v.AddMember("rudder", s.rudder, a);
-		v.AddMember("aileron", s.aileron, a);
 		d.PushBack(v, a);
 	}
 	GenericStringBuffer<UTF8<>> sbuf;
@@ -166,9 +180,6 @@ bool Persist(void *id, char *str, void *data)
 	s.rvelx = vs.rvel.x;
 	s.rvely = vs.rvel.y;
 	s.rvelz = vs.rvel.z;
-	s.elevator = v->GetControlSurfaceLevel(AIRCTRL_ELEVATOR);
-	s.rudder = v->GetControlSurfaceLevel(AIRCTRL_RUDDER);
-	s.aileron = v->GetControlSurfaceLevel(AIRCTRL_AILERON);
 	VECTOR3 force;
 	v->GetForceVector(force);
 	VECTOR3 acc = force / v->GetMass();
@@ -180,7 +191,7 @@ bool Persist(void *id, char *str, void *data)
 	string name = v->GetName();
 	states[name] = s;
 	string json = getTele(states);
-	curl_post("http://localhost:5000/persist", json);
+	curl_post("http://orbiter.world/persist?pid=" + persistId, json);
 	return true;
 }
 
