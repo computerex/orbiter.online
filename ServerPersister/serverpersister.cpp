@@ -22,7 +22,7 @@ class SimpleVesselState
 {
 public:
 	bool landed;
-	string refplanet, name, className;
+	string refplanet, name, className, persisterId;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
 		retro, hover, main, mjd, accx, accy, accz;
 };
@@ -31,7 +31,7 @@ map<string, SimpleVesselState> vesselList, serverVesselList;
 vector<string> masterConfigFileList;
 mutex stateLock;
 double last_update_time=0;
-string persistID = "";
+string persisterId = "";
 thread *serverThread;
 
 void ScanConfigDir(const char *ppath, vector<string>& configFileList)
@@ -100,6 +100,7 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 			s.arotz = d[i]["arotz"].GetDouble();
 			s.heading = d[i]["heading"].GetDouble();
 			s.className = d[i]["className"].GetString();
+			s.persisterId = d[i]["persisterId"].GetString();
 			s.retro = d[i]["retro"].GetDouble();
 			s.hover = d[i]["hover"].GetDouble();
 			s.main = d[i]["main"].GetDouble();
@@ -152,6 +153,8 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		v.AddMember("className", valr, a);
 		valr = Value(s.name.c_str(), a);
 		v.AddMember("name", valr, a);
+		valr = Value(persisterId.c_str(), a);
+		v.AddMember("persisterId", valr, a);
 		d.PushBack(v, a);
 	}
 	GenericStringBuffer<UTF8<>> sbuf;
@@ -168,7 +171,7 @@ void proc()
 		map<string, SimpleVesselState> vesselStates = vesselList;
 		stateLock.unlock();
 		string teleStr = getTele(vesselStates);
-		string resp = curl_post("http://orbiter.world/posttele?pid=" + persistID, teleStr);
+		string resp = curl_post("http://orbiter.world/posttele?pid=" + persisterId, teleStr);
 		map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
 
 		stateLock.lock();
@@ -193,11 +196,11 @@ DLLCLBK void ExitModule(HINSTANCE hDLL)
 
 DLLCLBK void opcCloseRenderViewport()
 {
-	//curl_post("http://orbiter.world/persister/exit?pid=" + persistID, "{}");
+	//curl_post("http://orbiter.world/persister/exit?pid=" + persisterId, "{}");
 }
 
-string getPersistIDFromDisk() {
-	FILE* file = fopen("persistid", "r");
+string getpersisterIdFromDisk() {
+	FILE* file = fopen("persisterId", "r");
 	if (file == 0) return "";
 	char buffer[512];
 	fgets(buffer, 512, file);
@@ -209,11 +212,11 @@ bool first = false;
 DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 	if (!first) {
 		first = true;
-		persistID = getPersistIDFromDisk();
-		if (persistID == "") {
-			persistID = curl_get("http://orbiter.world/persister/register");
-			FILE* persistFile = fopen("persistid", "w");
-			fputs(persistID.c_str(), persistFile);
+		persisterId = getpersisterIdFromDisk();
+		if (persisterId == "") {
+			persisterId = curl_get("http://orbiter.world/persister/register");
+			FILE* persistFile = fopen("persisterId", "w");
+			fputs(persisterId.c_str(), persistFile);
 			fclose(persistFile);
 		}
 		serverThread = new thread(proc);
@@ -243,6 +246,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			s.aroty = vs.arot.y;
 			s.arotz = vs.arot.z;
 			s.className = v->GetClassNameA();
+			s.persisterId = persisterId;
 			s.heading = vs.surf_hdg;
 			s.mjd = mjd;
 			s.hover = v->GetThrusterGroupLevel(THGROUP_HOVER);
@@ -305,6 +309,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 				state.aroty = vs.arot.y;
 				state.arotz = vs.arot.z;
 				state.className = v->GetClassNameA();
+				state.persisterId = persisterId;
 				state.heading = vs.surf_hdg;
 				state.mjd = mjd;
 				state.hover = v->GetThrusterGroupLevel(THGROUP_HOVER);

@@ -2,7 +2,6 @@
 #define ORBITER_MODULE
 #define _CRT_SECURE_NO_WARNINGS
 
-
 #include <windows.h>
 #include <stdio.h>
 #include <math.h>
@@ -30,7 +29,7 @@ DWORD l_tick_count = GetTickCount();
 CRITICAL_SECTION mjdlock;
 bool first = false;
 std::thread *t1;
-string persistId = "";
+string persisterId = "";
 
 void mjd_sync() {
 	while (true) {
@@ -49,8 +48,8 @@ void mjd_sync() {
 }
 
 
-string getPersistIDFromDisk() {
-	FILE* file = fopen("persistid", "r");
+string getpersisterIdFromDisk() {
+	FILE* file = fopen("persisterId", "r");
 	if (file == 0) return "";
 	char buffer[512];
 	fgets(buffer, 512, file);
@@ -71,20 +70,13 @@ DLLCLBK void InitModule (HINSTANCE hDLL)
 	spec.context = NULL;
 	spec.msgproc = MJDControllerMFD::MsgProc;
 	mode = oapiRegisterMFDMode (spec);
-	persistId = getPersistIDFromDisk();
-	if (persistId == "") {
-		persistId = curl_get("http://orbiter.world/persister/register");
-		FILE* persistFile = fopen("persistid", "w");
-		fputs(persistId.c_str(), persistFile);
-		fclose(persistFile);
-	}
 }
 
 class SimpleVesselState
 {
 public:
 	bool landed;
-	string refplanet, name, className;
+	string refplanet, name, className, persisterId;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
 		retro, hover, main, mjd, accx, accy, accz;
 };
@@ -130,6 +122,8 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		v.AddMember("className", valr, a);
 		valr = Value(s.name.c_str(), a);
 		v.AddMember("name", valr, a);
+		valr = Value(persisterId.c_str(), a);
+		v.AddMember("persisterId", valr, a);
 		v.AddMember("mjd", s.mjd, a);
 		v.AddMember("accx", s.accx, a);
 		v.AddMember("accy", s.accy, a);
@@ -164,6 +158,7 @@ bool Persist(void *id, char *str, void *data)
 	s.aroty = vs.arot.y;
 	s.arotz = vs.arot.z;
 	s.className = v->GetClassNameA();
+	s.persisterId = persisterId;
 	s.heading = vs.surf_hdg;
 	s.mjd = oapiGetSimMJD();
 	s.hover = v->GetThrusterGroupLevel(THGROUP_HOVER);
@@ -191,7 +186,7 @@ bool Persist(void *id, char *str, void *data)
 	string name = v->GetName();
 	states[name] = s;
 	string json = getTele(states);
-	curl_post("http://orbiter.world/persist?pid=" + persistId, json);
+	curl_post("http://orbiter.world/persist?pid=" + persisterId, json);
 	return true;
 }
 
@@ -199,6 +194,13 @@ DLLCLBK void opcPreStep (double simt, double simdt, double mjd)
 {
 	if (!first) {
 		first = true;
+		persisterId = getpersisterIdFromDisk();
+		if (persisterId == "") {
+			persisterId = curl_get("http://orbiter.world/persister/register");
+			FILE* persistFile = fopen("persisterId", "w");
+			fputs(persisterId.c_str(), persistFile);
+			fclose(persistFile);
+		}
 		InitializeCriticalSection(&mjdlock);
 		t1 = new std::thread(mjd_sync);
 		return;

@@ -59,7 +59,8 @@ app.post('/persist', function(req, res){
     }
     persisterId = keys[0];
   }
-  newVessels[pid] = req.body;
+  req.body[persisterId] = persisterId;
+  newVessels[persisterId] = req.body;
   res.send({}, 200);
 });
 
@@ -79,10 +80,37 @@ app.post('/teletest', function(req, res) {
   res.send({}, 200);
 });
 
+function flattenByGreatestMJD(states) {
+  var nameToStateHash = {};
+  for(var k = 0; k < states.length; k++) {
+    var name = states[k].name;
+    if (nameToStateHash[name] == null) {
+      nameToStateHash[name] = [states[k]];
+    } else {
+      nameToStateHash[name].push(states[k]);
+    }
+  }
+  var newStates = [];
+  var uniqueStateNames = Object.keys(nameToStateHash);
+  for(var k = 0; k < uniqueStateNames.length; k++) {
+    var allStates = nameToStateHash[uniqueStateNames[k]];
+    // select by greatest mjd
+    var maxIndex = 0;
+    for(var j = 1; j < allStates.length; j++) {
+      if (allStates[j].mjd > allStates[maxIndex]) {
+        maxIndex = j;
+      }
+    }
+    newStates.push(allStates[maxIndex]);
+  }
+
+  return newStates;
+}
+
 app.post('/posttele', function(req, res){
   var vesselsToSpawn = newVessels[req.query.pid];
   if (vesselsToSpawn == null) vesselsToSpawn = [];
-  var removeList = [];
+/*  var removeList = [];
   for(var k = 0; k < vesselsToSpawn.length; k++) {
     for(var j = 0; j < persisters[req.query.pid].length; j++) {
       if (persisters[req.query.pid][j].name == vesselsToSpawn[k].name) {
@@ -103,8 +131,15 @@ app.post('/posttele', function(req, res){
       }
     }
   }
-  persisters[req.query.pid] = req.body.concat(vesselsToSpawn);
-  console.log(persisters);
+  if (removeList.length > 0) {
+    console.log("!!!!!!!!! PERSISTER STATE !!!!!!!!!!!!!!");
+    console.log(persisters[req.query.pid]);
+  }
+*/
+  var per = persisters[req.query.pid];
+  if (per == null) per = [];
+  persisters[req.query.pid] = flattenByGreatestMJD(req.body.concat(vesselsToSpawn.concat(per)));
+  console.log(persisters[req.query.pid]);
   res.send(persisters[req.query.pid], 200);
 });
 

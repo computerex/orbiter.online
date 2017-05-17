@@ -22,7 +22,7 @@ class SimpleVesselState
 {
 public:
 	bool landed;
-	string refplanet, name, className;
+	string refplanet, name, className, persisterId;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
 		retro, hover, main, mjd, accx, accy, accz;
 };
@@ -33,6 +33,7 @@ double last_update_time = -300, initTime = 0;
 mutex stateLock;
 thread* serverThread;
 bool first = false;
+string persisterId = "";
 
 void ScanConfigDir(const char *ppath, vector<string>& configFileList)
 {
@@ -107,6 +108,7 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 			s.accx = d[i]["accx"].GetDouble();
 			s.accy = d[i]["accy"].GetDouble();
 			s.accz = d[i]["accz"].GetDouble();
+			s.persisterId = d[i]["persisterId"].GetString();
 			newVesselList[name] = s;
 		}
 	}
@@ -118,6 +120,7 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 	double syst = oapiGetSysTime();
 	bool didSlowUpdate = false;
 	for (auto it = vessels.begin(); it != vessels.end(); ++it) {
+		if (it->second.persisterId == persisterId) continue;
 		OBJHANDLE h = oapiGetVesselByName((char*)it->first.c_str());
 		VESSELSTATUS2 vs, vsold;
 		memset(&vs, 0, sizeof(VESSELSTATUS2));
@@ -195,9 +198,27 @@ void proc()
 	}
 }
 
+string getpersisterIdFromDisk() {
+	FILE* file = fopen("persisterId", "r");
+	if (file == 0) return "";
+	char buffer[512];
+	fgets(buffer, 512, file);
+	fclose(file);
+	return buffer;
+}
+bool persisterInit = false;
 
 DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
-
+	if (!persisterInit) {
+		persisterInit = true;
+		persisterId = getpersisterIdFromDisk();
+		if (persisterId == "") {
+			persisterId = curl_get("http://orbiter.world/persister/register");
+			FILE* persistFile = fopen("persisterId", "w");
+			fputs(persisterId.c_str(), persistFile);
+			fclose(persistFile);
+		}
+	}
 	double syst = oapiGetSysTime();
 	if (!first && oapiGetTimeAcceleration() == 1 && syst > 5) {
 		first = true;
