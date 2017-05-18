@@ -63,7 +63,13 @@ app.get('/tele', function(req, res){
     var pid = keys[k];
     tele = tele.concat(persisters[pid]);
   }
-  res.send(flattenByGreatestMJD(tele), 200);
+  var flattenedStates = flattenByGreatestMJD(tele);
+  var retStates = [];
+  for(var k = 0; k < flattenedStates.length; k++) {
+    if (Object.keys(flattenedStates[k]) == 0) continue;
+    retStates.push(flattenedStates[k]);
+  }
+  res.send(retStates, 200);
 });
 
 app.get('/mjd', function(req, res){
@@ -114,11 +120,14 @@ app.post('/posttele', function(req, res){
   if (persisters[req.query.pid] == null || Object.keys(persisters[req.query.pid]).length == 0) 
     persisters[req.query.pid] = [];
   var states = req.body.concat(vesselsToSpawn, persisters[req.query.pid]);
-  console.log("states: ");
-  console.log(states);
   states = flattenByGreatestMJD(states);
-  if (states != null && Object.keys(states).length != 0)
-    persisters[req.query.pid] = states;
+  var retStates = [];
+  for(var k = 0; k < states.length; k++) {
+    if (Object.keys(states[k]) == 0) continue;
+    retStates.push(states[k]);
+  }
+  //if (states != null && Object.keys(states).length != 0)
+  persisters[req.query.pid] = retStates;
   res.send(persisters[req.query.pid], 200);
 });
 

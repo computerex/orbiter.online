@@ -187,7 +187,7 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 void proc()
 {
 	while (true) {
-		string resp = curl_get("http://localhost:5000/tele");
+		string resp = curl_get("http://orbiter.world/tele");
 		map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
 
 		stateLock.lock();
@@ -213,7 +213,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 		persisterInit = true;
 		persisterId = getpersisterIdFromDisk();
 		if (persisterId == "") {
-			persisterId = curl_get("http://localhost:5000/persister/register");
+			persisterId = curl_get("http://orbiter.world/persister/register");
 			FILE* persistFile = fopen("persisterId", "w");
 			fputs(persisterId.c_str(), persistFile);
 			fclose(persistFile);

@@ -35,7 +35,7 @@ void mjd_sync() {
 	while (true) {
 		auto tickCount = GetTickCount();
 		if (l_tick_count + 1000 < tickCount) {
-			std::string req = curl_get("http://localhost:5000/mjd");
+			std::string req = curl_get("http://orbiter.world/mjd");
 			if (req == "") {
 				continue;
 			}
@@ -184,7 +184,7 @@ bool Persist(void *id, char *str, void *data)
 	string name = v->GetName();
 	states[name] = s;
 	string json = getTele(states);
-	curl_post("http://localhost:5000/persist?pid=" + persisterId, json);
+	curl_post("http://orbiter.world/persist?pid=" + persisterId, json);
 	return true;
 }
 
@@ -194,7 +194,7 @@ DLLCLBK void opcPreStep (double simt, double simdt, double mjd)
 		first = true;
 		persisterId = getpersisterIdFromDisk();
 		if (persisterId == "") {
-			persisterId = curl_get("http://localhost:5000/persister/register");
+			persisterId = curl_get("http://orbiter.world/persister/register");
 			FILE* persistFile = fopen("persisterId", "w");
 			fputs(persisterId.c_str(), persistFile);
 			fclose(persistFile);
