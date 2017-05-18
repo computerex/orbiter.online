@@ -7,7 +7,6 @@
 #include <math.h>
 #include <orbitersdk.h>
 #include "mjdcontroller.h"
-#include <oicom/oicominit.h>
 #include "curl.h"
 #include "miniPID.h"
 #include <thread>
@@ -21,7 +20,6 @@ using namespace rapidjson;
 
 int mode;
 
-OICOM_PID pid=0; // our plugin ID
 double last_update_simt = oapiGetSimTime();
 double real_mjd = 0;
 MiniPID mjdcontroller(1, 0, 500);
@@ -32,12 +30,16 @@ std::thread *t1;
 string persisterId = "";
 
 void mjd_sync() {
+	int tillLastUpdate = 0;
+	DWORD tiks_from_last_update = 0;
 	while (true) {
 		auto tickCount = GetTickCount();
 		if (l_tick_count + 1000 < tickCount) {
-			std::string req = curl_get("http://tycho.usno.navy.mil/cgi-bin/daterdnm.sh");
-			int p1 = req.find("MJD") + 4;
-			double mjd = atof(req.substr(p1, req.find("Day") - p1).c_str());
+			std::string req = curl_get("http://localhost:5000/mjd");
+			if (req == "") {
+				continue;
+			}
+			double mjd = atof(req.c_str());
 			EnterCriticalSection(&mjdlock);
 			real_mjd = mjd;
 			LeaveCriticalSection(&mjdlock);
@@ -59,9 +61,6 @@ string getpersisterIdFromDisk() {
 
 DLLCLBK void InitModule (HINSTANCE hDLL)
 {
-	// OICOM initialization
-	int ret = OICOM::GetOrbiterIntercom();
-	pid = OICOM::addPlugin("MJDControllerMFD");
 	
 	static char *name = "MJD controller";
 	MFDMODESPECEX spec;
@@ -84,7 +83,6 @@ public:
 DLLCLBK void ExitModule (HINSTANCE hDLL)
 {
 	oapiUnregisterMFDMode (mode);
-	OICOM::removePlugin(pid);
 }
 
 string getTele(map<string, SimpleVesselState> vessels) {
@@ -186,7 +184,7 @@ bool Persist(void *id, char *str, void *data)
 	string name = v->GetName();
 	states[name] = s;
 	string json = getTele(states);
-	curl_post("http://orbiter.world/persist?pid=" + persisterId, json);
+	curl_post("http://localhost:5000/persist?pid=" + persisterId, json);
 	return true;
 }
 
@@ -196,7 +194,7 @@ DLLCLBK void opcPreStep (double simt, double simdt, double mjd)
 		first = true;
 		persisterId = getpersisterIdFromDisk();
 		if (persisterId == "") {
-			persisterId = curl_get("http://orbiter.world/persister/register");
+			persisterId = curl_get("http://localhost:5000/persister/register");
 			FILE* persistFile = fopen("persisterId", "w");
 			fputs(persisterId.c_str(), persistFile);
 			fclose(persistFile);

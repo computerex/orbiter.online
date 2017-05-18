@@ -15,7 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\..\..\lib\curlhelper.lib" />
     <Library Include="..\..\..\lib\orbiter.lib" />
     <Library Include="..\..\..\lib\Orbitersdk.lib" />
   </ItemGroup>

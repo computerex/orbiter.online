@@ -2,7 +2,6 @@
 #define ORBITER_MODULE
 
 #include <orbitersdk.h>
-#include <curl.h>
 #include "mission.h"
 #include "miniPID.h"
 #include "rapidjson\rapidjson.h"
@@ -16,7 +15,6 @@ std::string html;
 DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 	if (!first) {
 		first = true;
-		html = curl_get("https://www.google.com");
 	}
 }
 

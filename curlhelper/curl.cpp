@@ -4,8 +4,6 @@
 #include <curl\curl.h>
 #include "curl.h"
 
-CRITICAL_SECTION cs2;
-
 static size_t
 WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
@@ -54,10 +52,8 @@ std::string curl_post(std::string url, std::string payload)
 {
 	if (!init){
 		curl_global_init(CURL_GLOBAL_ALL);
-		InitializeCriticalSection(&cs2);
 		init = true;
 	}
-	EnterCriticalSection(&cs2);
 	curl_handle = curl_easy_init();
 	struct WriteThis pooh;
 	struct curl_slist *headers = NULL;                      /* http headers to send with request */
@@ -122,17 +118,14 @@ std::string curl_post(std::string url, std::string payload)
 		printf("%lu bytes retrieved\n", (long)chunk.size);
 	}
 	curl_easy_cleanup(curl_handle);
-	LeaveCriticalSection(&cs2);
 	return std::string(chunk.memory);
 }
 std::string curl_get(std::string url)
 {
 	if (!init){
 		curl_global_init(CURL_GLOBAL_ALL);
-		InitializeCriticalSection(&cs2);
 		init = true;
 	}
-	EnterCriticalSection(&cs2);
 	curl_handle = curl_easy_init();
 	struct MemoryStruct chunk;
 
@@ -174,7 +167,6 @@ std::string curl_get(std::string url)
 		printf("%lu bytes retrieved\n", (long)chunk.size);
 	}
 	curl_easy_cleanup(curl_handle);
-	LeaveCriticalSection(&cs2);
 	return std::string(chunk.memory);
 }
 

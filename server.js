@@ -1,3 +1,4 @@
+var orb = require('orbjs');
 var express = require('express');
 var app = express();
 var uuid = require('uuid/v4');
@@ -26,7 +27,7 @@ app.get('/tele', function(req, res){
   var keys = Object.keys(persisters);
   if (keys.length < 1) {
     console.log("we have no persisters :(");
-    res.send({}, 200);
+    res.send([], 200);
     return;
   }
   var tele = [];
@@ -37,6 +38,10 @@ app.get('/tele', function(req, res){
   res.send(tele, 200);
 });
 
+app.get('/mjd', function(req, res){
+  res.status(200).send(""+orb.time.JDtoMJD(orb.time.dateToJD(new Date())));
+});
+
 app.get('/persister/register', function(req, res) {
   var pid = uuid();
   persisters[pid] = {};
@@ -44,8 +49,6 @@ app.get('/persister/register', function(req, res) {
 });
 
 app.post('/persist', function(req, res){
-  console.log("current persisters: ");
-  console.log(persisters);
   var persisterId;
   if (req.query.pid != null && persisters[req.query.pid] != null) {
     persisterId = req.query.pid;
@@ -74,12 +77,6 @@ app.post('/persister/exit', function(req, res) {
   res.send({}, 200);
 });
 
-app.post('/teletest', function(req, res) {
-  console.log(req.body);
-  console.log(req.query);
-  res.send({}, 200);
-});
-
 function flattenByGreatestMJD(states) {
   var nameToStateHash = {};
   for(var k = 0; k < states.length; k++) {
@@ -97,6 +94,7 @@ function flattenByGreatestMJD(states) {
     // select by greatest mjd
     var maxIndex = 0;
     for(var j = 1; j < allStates.length; j++) {
+      if (Object.keys(allStates[j]).length == 0) continue;
       if (allStates[j].mjd > allStates[maxIndex]) {
         maxIndex = j;
       }
@@ -109,7 +107,7 @@ function flattenByGreatestMJD(states) {
 
 app.post('/posttele', function(req, res){
   var vesselsToSpawn = newVessels[req.query.pid];
-  if (vesselsToSpawn == null) vesselsToSpawn = [];
+  if (vesselsToSpawn == null || !Array.isArray(vesselsToSpawn)) vesselsToSpawn = [];
 /*  var removeList = [];
   for(var k = 0; k < vesselsToSpawn.length; k++) {
     for(var j = 0; j < persisters[req.query.pid].length; j++) {
@@ -137,9 +135,12 @@ app.post('/posttele', function(req, res){
   }
 */
   var per = persisters[req.query.pid];
-  if (per == null) per = [];
-  persisters[req.query.pid] = flattenByGreatestMJD(req.body.concat(vesselsToSpawn.concat(per)));
-  console.log(persisters[req.query.pid]);
+  if (per == null || !Array.isArray(req.per)) per = [];
+  if (req.body == null || !Array.isArray(req.body)) req.body = [];
+  var states = flattenByGreatestMJD(req.body.concat(vesselsToSpawn.concat(per)));
+  if (Array.isArray(states)) {
+    persisters[req.query.pid] = states;
+  }
   res.send(persisters[req.query.pid], 200);
 });
 
