@@ -213,7 +213,7 @@ DLLCLBK void opcPreStep (double simt, double simdt, double mjd)
 	double delta = rmjd - mjd;
 	delta *= 60 * 60 * 24;
 	
-	if (fabs(delta) < 1)
+	if (fabs(delta) < 2)
 	{
 		oapiSetTimeAcceleration(1.0);
 	}else 
