@@ -101,6 +101,10 @@ app.post('/persist', function(req, res){
   res.send({}, 200);
 });
 
+app.get('/persister/all', function(req, res){
+  res.send(persisters, 200);
+});
+
 app.post('/persister/exit', function(req, res) {
   var pid = req.query.pid;
   // TODO move the vessels to an existing persister..

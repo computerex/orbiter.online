@@ -2,6 +2,9 @@
 #define ORBITER_MODULE
 #define _CRT_SECURE_NO_WARNINGS
 
+#define LONG_POLL 1
+#define SHORT_POLL 1
+
 #include <Shlwapi.h>
 #include <orbitersdk.h>
 #include "curl.h"
@@ -17,6 +20,17 @@
 
 using namespace std; 
 using namespace rapidjson;
+
+DLLCLBK void InitModule(HINSTANCE hDLL)
+{
+	curl_init();
+}
+
+DLLCLBK void ExitModule(HINSTANCE hDLL)
+{
+	curl_clean();
+}
+
 
 class SimpleVesselState
 {
@@ -115,6 +129,16 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 	return newVesselList;
 }
 double slowUpdateLastsyst = 0;
+class SimpleAverageState {
+public:
+	VECTOR3 rpos;
+	int samples;
+	SimpleAverageState::SimpleAverageState() {
+		samples = 0;
+		rpos = _V(0, 0, 0);
+	}
+};
+map<string, vector<VECTOR3> > stateAverages;
 void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 {
 	double syst = oapiGetSysTime();
@@ -136,7 +160,7 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 			v->GetPeDist(pe);
 			pe -= oapiGetSize(v->GetSurfaceRef());
 			if (pe > 0) {
-				if (slowUpdateLastsyst + 60 > syst) {
+				if (slowUpdateLastsyst + LONG_POLL > syst) {
 					continue;
 				}
 				else {
@@ -174,10 +198,33 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 		v->GlobalRot(_V(state.accx*dt, state.accy*dt, state.accz*dt), vel);
 		vs.rvel += vel;
 		vs.rpos += vs.rvel * dt;
+		/*
+		if (stateAverages.count(state.name) == 0) {
+			vector<VECTOR3> pos;
+			pos.push_back(vs.rpos);
+			stateAverages[state.name] = pos;
+		}
+		else {
+			auto avgState = stateAverages[state.name];
+			avgState.push_back(vs.rpos);
+		}
+		auto avgState = stateAverages[state.name];
+		vector<VECTOR3> st(avgState.end() - 5, avgState.end());
+		VECTOR3 rpos = _V(0, 0, 0);
+		for (int i = 0; i < st.size(); i++)
+			rpos += st[i];
+		if (st.size() >= 50)
+			vs.rpos = rpos/st.size();*/
 		v->DefSetStateEx(&vs);
+		/*
+		if (avgState.size() > 200) {
+			vector<VECTOR3> st(avgState.end() - 5, avgState.end());
+			avgState = st;
+		}*/
 		v->SetThrusterGroupLevel(THGROUP_MAIN, state.main);
 		v->SetThrusterGroupLevel(THGROUP_HOVER, state.hover);
 		v->SetThrusterGroupLevel(THGROUP_RETRO, state.retro);
+		v->ActivateNavmode(NAVMODE_KILLROT);
 	}
 	if (didSlowUpdate) {
 		slowUpdateLastsyst = syst;
@@ -194,7 +241,7 @@ void proc()
 		serverVesselList = newVesselList;
 		stateLock.unlock();
 
-		Sleep(1000 * 1);
+		Sleep(SHORT_POLL * 1);
 	}
 }
 
@@ -226,17 +273,19 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 		initTime = syst;
 	}
 	
-	if ((syst > last_update_time + 1) && first && (syst-initTime) > 2) {
+	if ((syst > last_update_time + SHORT_POLL) && first && (syst-initTime) > 2) {
 		map<string, SimpleVesselState> newVesselList;
 		stateLock.lock();
 		newVesselList = serverVesselList;
 		stateLock.unlock();
-		for (auto it = vesselList.begin(); it != vesselList.end(); ++it)
-		{
-			if (newVesselList.count(it->first) == 0) {
-				OBJHANDLE v = oapiGetVesselByName((char*)it->first.c_str());
-				if (oapiIsVessel(v)) {
-					oapiDeleteVessel(v);
+		if (newVesselList.size() > 0) {
+			for (auto it = vesselList.begin(); it != vesselList.end(); ++it)
+			{
+				if (newVesselList.count(it->first) == 0) {
+					OBJHANDLE v = oapiGetVesselByName((char*)it->first.c_str());
+					if (oapiIsVessel(v)) {
+						oapiDeleteVessel(v);
+					}
 				}
 			}
 		}

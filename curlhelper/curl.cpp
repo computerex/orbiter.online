@@ -45,16 +45,10 @@ static size_t read_callback(void *ptr, size_t size, size_t nmemb, void *userp)
 
 	return 0;                          /* no more data left to deliver */
 }
-bool init = false;
-CURL *curl_handle;
-CURLcode res;
+
 std::string curl_post(std::string url, std::string payload)
 {
-	if (!init){
-		curl_global_init(CURL_GLOBAL_ALL);
-		init = true;
-	}
-	curl_handle = curl_easy_init();
+	CURL* curl_handle = curl_easy_init();
 	struct WriteThis pooh;
 	struct curl_slist *headers = NULL;                      /* http headers to send with request */
 	char buffer[512];
@@ -99,7 +93,7 @@ std::string curl_post(std::string url, std::string payload)
 	curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, headers);
 
 	/* get it! */
-	res = curl_easy_perform(curl_handle);
+	CURLcode res = curl_easy_perform(curl_handle);
 
 	/* check for errors */
 	if (res != CURLE_OK) {
@@ -122,11 +116,7 @@ std::string curl_post(std::string url, std::string payload)
 }
 std::string curl_get(std::string url)
 {
-	if (!init){
-		curl_global_init(CURL_GLOBAL_ALL);
-		init = true;
-	}
-	curl_handle = curl_easy_init();
+	CURL* curl_handle = curl_easy_init();
 	struct MemoryStruct chunk;
 
 	chunk.memory = (char*)malloc(1);  /* will be grown as needed by the realloc above */
@@ -149,7 +139,7 @@ std::string curl_get(std::string url)
 	curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
 
 	/* get it! */
-	res = curl_easy_perform(curl_handle);
+	CURLcode res = curl_easy_perform(curl_handle);
 
 	/* check for errors */
 	if (res != CURLE_OK) {
@@ -173,4 +163,9 @@ std::string curl_get(std::string url)
 void curl_clean()
 {
 	curl_global_cleanup();
+}
+
+void curl_init()
+{
+	curl_global_init(CURL_GLOBAL_ALL);
 }

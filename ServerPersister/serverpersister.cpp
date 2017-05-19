@@ -2,6 +2,10 @@
 #define ORBITER_MODULE
 #define _CRT_SECURE_NO_WARNINGS
 
+
+#define LONG_POLL 1
+#define SHORT_POLL 1
+
 #include <Shlwapi.h>
 #include <orbitersdk.h>
 #include "curl.h"
@@ -179,7 +183,7 @@ void proc()
 		serverVesselList = newVesselList;
 		stateLock.unlock();
 
-		Sleep(1000);
+		Sleep(SHORT_POLL);
 	}
 }
 void checkgoogle()
@@ -188,11 +192,13 @@ void checkgoogle()
 }
 DLLCLBK void InitModule(HINSTANCE hDLL)
 {
+	curl_init();
 	//gcheck.join();
 }
 
 DLLCLBK void ExitModule(HINSTANCE hDLL)
 {
+	curl_clean();
 }
 
 DLLCLBK void opcCloseRenderViewport()
@@ -223,7 +229,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 		serverThread = new thread(proc);
 	}
 	double syst = oapiGetSysTime();
-	if (syst > last_update_time + 1) {
+	if (syst > last_update_time + SHORT_POLL) {
 		// update state vectors
 		stateLock.lock();
 		for (map<string, SimpleVesselState>::iterator it = vesselList.begin(); it != vesselList.end(); it++) {
@@ -339,13 +345,15 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 		map<string, SimpleVesselState> localVessels = vesselList;
 		stateLock.unlock();
 
-		// delete vessels that no longer should be here
-		for (auto it = localVessels.begin(); it != localVessels.end(); ++it)
-		{
-			if (newVesselList.count(it->first) == 0) {
-				OBJHANDLE v = oapiGetVesselByName((char*)it->first.c_str());
-				if (oapiIsVessel(v)) {
-					oapiDeleteVessel(v);
+		if (newVesselList.size() > 0) {
+			// delete vessels that no longer should be here
+			for (auto it = localVessels.begin(); it != localVessels.end(); ++it)
+			{
+				if (newVesselList.count(it->first) == 0) {
+					OBJHANDLE v = oapiGetVesselByName((char*)it->first.c_str());
+					if (oapiIsVessel(v)) {
+						oapiDeleteVessel(v);
+					}
 				}
 			}
 		}

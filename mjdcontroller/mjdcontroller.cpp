@@ -32,20 +32,28 @@ string persisterId = "";
 void mjd_sync() {
 	int tillLastUpdate = 0;
 	DWORD tiks_from_last_update = 0;
+	unsigned int cycles = 0;
+	double alpha = 1e5;
 	while (true) {
-		auto tickCount = GetTickCount();
-		if (l_tick_count + 1000 < tickCount) {
+		DWORD tickCount = GetTickCount();
+		if (l_tick_count + 2000 < tickCount) {
 			std::string req = curl_get("http://orbiter.world/mjd");
 			if (req == "") {
 				continue;
 			}
+			cycles = 0;
 			double mjd = atof(req.c_str());
 			EnterCriticalSection(&mjdlock);
 			real_mjd = mjd;
 			LeaveCriticalSection(&mjdlock);
 			l_tick_count = tickCount;
-		}
-		Sleep(50);
+			continue;
+		};
+		EnterCriticalSection(&mjdlock);
+		real_mjd += ((((100.) * (double)cycles)/1000.) / 60. / 60. / 24.) / alpha;
+		LeaveCriticalSection(&mjdlock);
+		cycles += 1;
+		Sleep(100);
 	}
 }
 
@@ -61,7 +69,7 @@ string getpersisterIdFromDisk() {
 
 DLLCLBK void InitModule (HINSTANCE hDLL)
 {
-	
+	curl_init();
 	static char *name = "MJD controller";
 	MFDMODESPECEX spec;
 	spec.name    = name;
@@ -82,6 +90,7 @@ public:
 
 DLLCLBK void ExitModule (HINSTANCE hDLL)
 {
+	curl_clean();
 	oapiUnregisterMFDMode (mode);
 }
 
