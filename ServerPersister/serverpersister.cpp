@@ -3,8 +3,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 
-#define LONG_POLL 0.5
-#define SHORT_POLL 0.5
+#define LONG_POLL 1
+#define SHORT_POLL 1
 
 #include <Shlwapi.h>
 #include <orbitersdk.h>
@@ -28,7 +28,7 @@ public:
 	bool landed;
 	string refplanet, name, className, persisterId;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
-		retro, hover, main, mjd, accx, accy, accz;
+		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz;
 };
 
 map<string, SimpleVesselState> vesselList, serverVesselList;
@@ -112,6 +112,9 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 			s.accx = d[i]["accx"].GetDouble();
 			s.accy = d[i]["accy"].GetDouble();
 			s.accz = d[i]["accz"].GetDouble();
+			s.angx = d[i]["angx"].GetDouble();
+			s.angy = d[i]["angy"].GetDouble();
+			s.angz = d[i]["angz"].GetDouble();
 			newVesselList[name] = s;
 		}
 	}
@@ -153,6 +156,9 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		v.AddMember("accx", s.accx, a);
 		v.AddMember("accy", s.accy, a);
 		v.AddMember("accz", s.accz, a);
+		v.AddMember("angx", s.angx, a);
+		v.AddMember("angy", s.angy, a);
+		v.AddMember("angz", s.angz, a);
 		valr = Value(s.className.c_str(), a);
 		v.AddMember("className", valr, a);
 		valr = Value(s.name.c_str(), a);
@@ -170,7 +176,7 @@ string getTele(map<string, SimpleVesselState> vessels) {
 
 void proc()
 {
-	Sleep(5000 * 10);
+	Sleep(5000);
 	while (true) {
 		stateLock.lock();
 		map<string, SimpleVesselState> vesselStates = vesselList;
@@ -270,12 +276,16 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			s.rvelx = vs.rvel.x;
 			s.rvely = vs.rvel.y;
 			s.rvelz = vs.rvel.z;
-			VECTOR3 force, acc;
+			VECTOR3 force, acc, avel;
 			v->GetForceVector(force);
 			acc = force / v->GetMass();
 			s.accx = acc.x;
 			s.accy = acc.y;
 			s.accz = acc.z;
+			v->GetAngularVel(avel);
+			s.angx = avel.x;
+			s.angy = avel.y;
+			s.angz = avel.z;
 			vesselList[s.name] = s;
 		}
 		map<string, SimpleVesselState> newVesselList = serverVesselList;
@@ -332,12 +342,16 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 				state.rvelx = vs.rvel.x;
 				state.rvely = vs.rvel.y;
 				state.rvelz = vs.rvel.z;
-				VECTOR3 acc, force;
+				VECTOR3 acc, force, avel;
 				v->GetForceVector(force);
+				v->GetAngularVel(avel);
 				acc = force / v->GetMass();
 				state.accx = acc.x;
 				state.accy = acc.y;
 				state.accz = acc.z;
+				state.angx = avel.x;
+				state.angy = avel.y;
+				state.angz = avel.z;
 			}
 			vesselList[state.name] = state;
 		}

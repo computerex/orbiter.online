@@ -2,8 +2,8 @@
 #define ORBITER_MODULE
 #define _CRT_SECURE_NO_WARNINGS
 
-#define LONG_POLL 0.5
-#define SHORT_POLL 0.5
+#define LONG_POLL 1
+#define SHORT_POLL 1
 
 #include <Shlwapi.h>
 #include <orbitersdk.h>
@@ -38,7 +38,7 @@ public:
 	bool landed;
 	string refplanet, name, className, persisterId;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
-		retro, hover, main, mjd, accx, accy, accz;
+		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz;
 };
 
 map<string, SimpleVesselState> vesselList, serverVesselList;
@@ -122,6 +122,9 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 			s.accx = d[i]["accx"].GetDouble();
 			s.accy = d[i]["accy"].GetDouble();
 			s.accz = d[i]["accz"].GetDouble();
+			s.angx = d[i]["angx"].GetDouble();
+			s.angy = d[i]["angy"].GetDouble();
+			s.angz = d[i]["angz"].GetDouble();
 			s.persisterId = d[i]["persisterId"].GetString();
 			newVesselList[name] = s;
 		}
@@ -216,6 +219,7 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 		if (st.size() >= 50)
 			vs.rpos = rpos/st.size();*/
 		v->DefSetStateEx(&vs);
+		v->SetAngularVel(_V(state.angx, state.angy, state.angz));
 		/*
 		if (avgState.size() > 200) {
 			vector<VECTOR3> st(avgState.end() - 5, avgState.end());

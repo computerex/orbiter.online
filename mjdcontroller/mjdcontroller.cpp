@@ -72,7 +72,7 @@ public:
 	bool landed;
 	string refplanet, name, className, persisterId;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
-		retro, hover, main, mjd, accx, accy, accz;
+		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz;
 };
 
 DLLCLBK void ExitModule (HINSTANCE hDLL)
@@ -122,6 +122,9 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		v.AddMember("accx", s.accx, a);
 		v.AddMember("accy", s.accy, a);
 		v.AddMember("accz", s.accz, a);
+		v.AddMember("angx", s.angx, a);
+		v.AddMember("angy", s.angy, a);
+		v.AddMember("angz", s.angz, a);
 		d.PushBack(v, a);
 	}
 	GenericStringBuffer<UTF8<>> sbuf;
@@ -169,12 +172,16 @@ bool Persist(void *id, char *str, void *data)
 	s.rvelx = vs.rvel.x;
 	s.rvely = vs.rvel.y;
 	s.rvelz = vs.rvel.z;
-	VECTOR3 force;
+	VECTOR3 force, avel;
 	v->GetForceVector(force);
+	v->GetAngularVel(avel);
 	VECTOR3 acc = force / v->GetMass();
 	s.accx = acc.x;
 	s.accy = acc.y;
 	s.accz = acc.z;
+	s.angx = avel.x;
+	s.angy = avel.y;
+	s.angz = avel.z;
 
 	map<string, SimpleVesselState> states;
 	string name = v->GetName();
