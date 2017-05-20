@@ -30,30 +30,17 @@ std::thread *t1;
 string persisterId = "";
 
 void mjd_sync() {
-	int tillLastUpdate = 0;
-	DWORD tiks_from_last_update = 0;
-	unsigned int cycles = 0;
-	double alpha = 1e5;
 	while (true) {
 		DWORD tickCount = GetTickCount();
-		if (l_tick_count + 2000 < tickCount) {
-			std::string req = curl_get("http://orbiter.world/mjd");
-			if (req == "") {
-				continue;
-			}
-			cycles = 0;
-			double mjd = atof(req.c_str());
-			EnterCriticalSection(&mjdlock);
-			real_mjd = mjd;
-			LeaveCriticalSection(&mjdlock);
-			l_tick_count = tickCount;
+		std::string req = curl_get("http://orbiter.world/mjd");
+		if (req == "") {
 			continue;
-		};
+		}
+		double mjd = atof(req.c_str());
 		EnterCriticalSection(&mjdlock);
-		real_mjd += ((((100.) * (double)cycles)/1000.) / 60. / 60. / 24.) / alpha;
+		real_mjd = mjd;
 		LeaveCriticalSection(&mjdlock);
-		cycles += 1;
-		Sleep(100);
+		Sleep(3000);
 	}
 }
 
@@ -196,7 +183,8 @@ bool Persist(void *id, char *str, void *data)
 	curl_post("http://orbiter.world/persist?pid=" + persisterId, json);
 	return true;
 }
-
+double oldRMjd = 0;
+double last_updt_syst = 0;
 DLLCLBK void opcPreStep (double simt, double simdt, double mjd)
 {
 	if (!first) {
@@ -217,16 +205,22 @@ DLLCLBK void opcPreStep (double simt, double simdt, double mjd)
 	double rmjd = real_mjd;
 	LeaveCriticalSection(&mjdlock);
 
-	if (rmjd == 0) return;
+	if (rmjd == 0) { oapiSetTimeAcceleration(1.0); return; }
+
+	double syst = oapiGetSysTime();
+	if (rmjd != oldRMjd) {
+		last_updt_syst = syst;
+	}
 
 	double delta = rmjd - mjd;
 	delta *= 60 * 60 * 24;
-	
-	if (fabs(delta) < 2)
+	delta += syst - last_updt_syst;
+	if (fabs(delta) < 1)
 	{
 		oapiSetTimeAcceleration(1.0);
 	}else 
 		oapiSetTimeAcceleration(delta + 1);
+	oldRMjd = rmjd;
 	//oapiSetTimeAcceleration(acc);
 	//sprintf(oapiDebugString(), "delta: %f acc: %f", delta, acc);
 }

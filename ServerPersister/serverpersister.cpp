@@ -3,8 +3,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 
-#define LONG_POLL 1
-#define SHORT_POLL 1
+#define LONG_POLL 0.5
+#define SHORT_POLL 0.5
 
 #include <Shlwapi.h>
 #include <orbitersdk.h>
@@ -183,7 +183,7 @@ void proc()
 		serverVesselList = newVesselList;
 		stateLock.unlock();
 
-		Sleep(SHORT_POLL);
+		Sleep(SHORT_POLL * 1000.);
 	}
 }
 void checkgoogle()

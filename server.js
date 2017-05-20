@@ -110,7 +110,8 @@ app.post('/persister/exit', function(req, res) {
   // TODO move the vessels to an existing persister..
   if (pid != null) {
     console.log("deleting persister: " + pid);
-    delete persisters.pid;
+    persisters[pid] = [];
+    newVessels[req.query.pid] = [];
   }
   res.send({}, 200);
 });
