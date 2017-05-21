@@ -23,6 +23,7 @@ var tele_timestamp = {};
 var persisters = {};
 var newVessels = {};
 var reconStates = [];
+var dockEvents = [];
 
 function flattenByGreatestMJD(states) {
   var nameToStateHash = {};
@@ -130,6 +131,19 @@ function reconPrune() {
   reconStates = reconNew;
 }
 
+function dockPrune() {
+  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
+  var dockNew = [];
+  for(var k = 0; k < dockEvents.length; k++) {
+    var state = dockEvents[k];
+    var dt = (mjd - state.mjd) * 60 * 60 * 24;
+    if (dt < 4) {
+      dockNew.push(state);
+    }
+  }
+  dockEvents = dockNew;
+}
+
 app.post('/recon', function(req, res) {
   var copyRecon = JSON.parse(JSON.stringify(reconStates));
   for(var k = 0; k < req.body.length; k++) {
@@ -138,6 +152,19 @@ app.post('/recon', function(req, res) {
   console.log("recons: ");
   console.log(reconStates);
   res.send(copyRecon, 200);
+});
+
+app.post('/dock', function(req, res) {
+  var copyDock = JSON.parse(JSON.stringify(dockEvents));
+  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
+  for(var k = 0; k < req.body.length; k++) {
+    var state = req.body[k];
+    state['mjd'] = mjd;
+    dockEvents.push(state);
+  }
+  console.log("dock: ");
+  console.log(dockEvents);
+  res.send(copyDock, 200);
 });
 
 app.post('/posttele', function(req, res){
@@ -164,4 +191,5 @@ app.use(express.static(__dirname + '/public_html'));
 console.log("magic happens on port 5000\n");
 
 setInterval(reconPrune, 2000);
+setInterval(dockPrune, 2000);
 app.listen(5000);

@@ -49,8 +49,15 @@ public:
 	double orientX, orientY, orientZ;
 };
 
+class DockEvent {
+public:
+	string reference, target, persisterId;
+	UINT refPort, targetPort;
+};
+
 map<string, SimpleVesselState> vesselList, serverVesselList;
 vector<ReconState> reconOutStates, reconInStates;
+vector<DockEvent> dockEventsIn, dockEventsOut;
 vector<string> masterConfigFileList;
 double last_update_time = -300, initTime = 0;
 mutex stateLock;
@@ -169,6 +176,26 @@ vector<ReconState> parseReconStates(string teleJson) {
 	return states;
 }
 
+vector<DockEvent> parseDockEvents(string teleJson) {
+	Document d;
+	d.Parse(teleJson.c_str());
+	vector<DockEvent> states;
+	if (d.IsArray()) {
+
+		DockEvent rs;
+		for (unsigned int i = 0; i < d.Size(); i++)
+		{
+			rs.reference = d[i]["reference"].GetString();
+			rs.target = d[i]["target"].GetString();
+			rs.refPort = d[i]["refPort"].GetUint();
+			rs.targetPort= d[i]["targetPort"].GetUint();
+			rs.persisterId = d[i]["persisterId"].GetString();
+			states.push_back(rs);
+		}
+	}
+	return states;
+}
+
 double slowUpdateLastsyst = 0;
 
 bool areDocked(OBJHANDLE a, OBJHANDLE b) {
@@ -186,6 +213,8 @@ bool areDocked(OBJHANDLE a, OBJHANDLE b) {
 map<string, double> lastReconUpdateForVessel;
 map<string, double> lastThrusterFireTime;
 double lastThrusterFireTimeCheckTime = 0;
+OBJHANDLE lastStepDockedVessel[100]; // up to 100 docking ports are synchronized
+
 bool isVesselActive(VESSEL* v) {
 	string name = v->GetName();
 	if (lastThrusterFireTime.count(name) == 0) return false;
@@ -197,13 +226,17 @@ bool isVesselActive(VESSEL* v) {
 bool shouldSendReconState(VESSEL* focus, VESSEL* target) {
 	double pe;
 	focus->GetPeDist(pe);
-	bool docked = areDocked(focus->GetHandle(), target->GetHandle());
 	bool focusIsActive = isVesselActive(focus);
-	bool targetIsActive = isVesselActive(target);
-	return (focusIsActive && pe > 0) || (docked);
+	//bool targetIsActive = isVesselActive(target);
+	return (focusIsActive && pe > 0);
 }
 
-void updateOrbiterVessels(map<string, SimpleVesselState> vessels, vector<ReconState> reconIn, vector<ReconState>& reconOut)
+void updateOrbiterVessels(map<string, SimpleVesselState> vessels, 
+	vector<ReconState> reconIn, 
+	vector<ReconState>& reconOut,
+	vector<DockEvent>& dockEventsIn, 
+	vector<DockEvent>& dockEventsOut
+	)
 {
 	double syst = oapiGetSysTime();
 	double simdt = oapiGetSimStep();
@@ -219,6 +252,7 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels, vector<ReconSt
 	for (auto it = vessels.begin(); it != vessels.end(); ++it) {
 		if (it->second.persisterId == persisterId) continue;
 		OBJHANDLE h = oapiGetVesselByName((char*)it->first.c_str());
+		// skip global coord updates for vessels which have had a recon update in past 3 seconds
 		if (lastReconUpdateForVessel.count(it->first) > 0) {
 			if (lastReconUpdateForVessel[it->first] < 3) continue;
 		}
@@ -285,7 +319,7 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels, vector<ReconSt
 			v->GetRelativeVel(focus->GetHandle(), rvel);
 			v->GetRotationMatrix(R);
 			lvel = tmul(R, rvel);
-			if ((length(displacement) > length(rvel)*simdt) || areDocked(focushandle, v->GetHandle())) {
+			if ((length(displacement) > length(rvel)*simdt)) {
 				VECTOR3 avg = (lpos + oldLpos) / 2.0;
 				avg = oldLpos;
 				focus->Local2Rel(avg, rel);
@@ -354,11 +388,44 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels, vector<ReconSt
 		lastReconUpdateForVessel[s.target] = syst;
 		v->SetGlobalOrientation(_V(s.orientX, s.orientY, s.orientZ));
 	}
+	for (unsigned int i = 0; i < dockEventsIn.size(); i++) {
+		auto s = dockEventsIn[i];
+		if (s.persisterId == persisterId) continue;
+		OBJHANDLE ref = oapiGetVesselByName((char*)s.reference.c_str());
+		if (!oapiIsVessel(ref)) continue;
+		OBJHANDLE target = oapiGetVesselByName((char*)s.target.c_str());
+		if (!oapiIsVessel(target)) continue;
+		VESSEL* vr = oapiGetVesselInterface(ref);
+		vr->Dock(target, s.refPort, s.targetPort, 1); // teleport target for docking
+	}
+	for (unsigned int i = 0; i < focus->DockCount(); i++) {
+		OBJHANDLE dockedVessel = focus->GetDockStatus(focus->GetDockHandle(i));
+		if (oapiIsVessel(dockedVessel) && !oapiIsVessel(lastStepDockedVessel[i])) {
+			DockEvent event;
+			VESSEL* refv = oapiGetVesselInterface(dockedVessel);
+			event.persisterId = persisterId;
+			event.reference = refv->GetName();
+			for (unsigned int j = 0; j < refv->DockCount(); j++) {
+				if (refv->GetDockStatus(refv->GetDockHandle(j)) == focushandle) {
+					event.refPort = j;
+					break;
+				}
+			}
+			event.target = focus->GetName();
+			event.targetPort = i;
+			dockEventsOut.push_back(event);
+		}
+		lastStepDockedVessel[i] = dockedVessel;
+	}
 	if (didSlowUpdate) {
 		slowUpdateLastsyst = syst;
 	}
 }
-
+DLLCLBK void opcFocusChanged(OBJHANDLE hGainsFocus, OBJHANDLE hLosesFocus) {
+	for (int i = 0; i < 100; i++) {
+		lastStepDockedVessel[i] = NULL;
+	}
+}
 string serializeReconStates(vector<ReconState> states)
 {
 	Document d;
@@ -394,6 +461,33 @@ string serializeReconStates(vector<ReconState> states)
 	return str;
 }
 
+string serializeDockEvents(vector<DockEvent> states)
+{
+	Document d;
+	d.SetArray();
+	Document::AllocatorType& a = d.GetAllocator();
+	for (unsigned int i = 0; i < states.size(); i++)
+	{
+		Value v("dockEvents");
+		v.SetObject();
+		DockEvent s = states[i];
+		v.AddMember("refPort", s.refPort, a);
+		v.AddMember("targetPort", s.targetPort, a);
+		Value valr(s.reference.c_str(), a);
+		v.AddMember("reference", valr, a);
+		valr = Value(s.target.c_str(), a);
+		v.AddMember("target", valr, a);
+		valr = Value(persisterId.c_str(), a);
+		v.AddMember("persisterId", valr, a);
+		d.PushBack(v, a);
+	}
+	GenericStringBuffer<UTF8<>> sbuf;
+	Writer<GenericStringBuffer<UTF8<>>> writer(sbuf);
+	d.Accept(writer);
+	std::string str = sbuf.GetString();
+	return str;
+}
+
 void proc()
 {
 	while (true) {
@@ -401,6 +495,8 @@ void proc()
 		map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
 		stateLock.lock();
 		vector<ReconState> reconStatesOut = reconOutStates;
+		vector<DockEvent> outDockEvents = dockEventsOut;
+		dockEventsOut.clear();
 		reconOutStates.clear();
 		serverVesselList = newVesselList;
 		stateLock.unlock();
@@ -409,6 +505,12 @@ void proc()
 		vector<ReconState> reconIn = parseReconStates(resp);
 		stateLock.lock();
 		reconInStates = reconIn;
+		stateLock.unlock();
+
+		resp = curl_post("http://orbiter.world/dock", serializeDockEvents(outDockEvents));
+		vector<DockEvent> dockIn = parseDockEvents(resp);
+		stateLock.lock();
+		dockEventsIn = dockIn;
 		stateLock.unlock();
 
 		Sleep(SHORT_POLL * 1000.);
@@ -446,9 +548,11 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 	if ((syst > last_update_time + SHORT_POLL) && first && (syst-initTime) > 2) {
 		map<string, SimpleVesselState> newVesselList;
 		vector<ReconState> newReconEvents, reconOut;
+		vector<DockEvent> newDockEvents, dockOut;
 		stateLock.lock();
 		newVesselList = serverVesselList;
 		newReconEvents = reconInStates;
+		newDockEvents = dockEventsIn;
 		stateLock.unlock();
 		if (newVesselList.size() > 0) {
 			for (auto it = vesselList.begin(); it != vesselList.end(); ++it)
@@ -462,9 +566,10 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			}
 		}
 		vesselList = newVesselList;
-		updateOrbiterVessels(vesselList, newReconEvents, reconOut);
+		updateOrbiterVessels(vesselList, newReconEvents, reconOut, newDockEvents, dockOut);
 		stateLock.lock();
 		reconOutStates = reconOut;
+		dockEventsOut = dockOut;
 		stateLock.unlock();
 		last_update_time = syst;
 	}
