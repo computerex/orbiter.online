@@ -22,6 +22,7 @@ var telemetry = [];
 var tele_timestamp = {};
 var persisters = {};
 var newVessels = {};
+var reconStates = [];
 
 function flattenByGreatestMJD(states) {
   var nameToStateHash = {};
@@ -116,6 +117,28 @@ app.post('/persister/exit', function(req, res) {
   res.send({}, 200);
 });
 
+function reconPrune() {
+  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
+  var reconNew = [];
+  for(var k = 0; k < reconStates.length; k++) {
+    var state = reconStates[k];
+    var dt = (mjd - state.mjd) * 60 * 60 * 24;
+    if (dt < 2) {
+      reconNew.push(state);
+    }
+  }
+  reconStates = reconNew;
+}
+
+app.post('/recon', function(req, res) {
+  var copyRecon = JSON.parse(JSON.stringify(reconStates));
+  for(var k = 0; k < req.body.length; k++) {
+    reconStates.push(req.body[k]);
+  }
+  console.log("recons: ");
+  console.log(reconStates);
+  res.send(copyRecon, 200);
+});
 
 app.post('/posttele', function(req, res){
   var vesselsToSpawn = newVessels[req.query.pid];
@@ -139,4 +162,6 @@ app.post('/posttele', function(req, res){
 app.use(express.static(__dirname + '/public_html'));
 
 console.log("magic happens on port 5000\n");
+
+setInterval(reconPrune, 2000);
 app.listen(5000);

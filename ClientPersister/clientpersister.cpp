@@ -41,7 +41,16 @@ public:
 		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz;
 };
 
+class ReconState {
+public:
+	string reference, target, persisterId;
+	double targetPosX, targetPosY, targetPosZ, mjd;
+	double targetVelX, targetVelY, targetVelZ;
+	double orientX, orientY, orientZ;
+};
+
 map<string, SimpleVesselState> vesselList, serverVesselList;
+vector<ReconState> reconOutStates, reconInStates;
 vector<string> masterConfigFileList;
 double last_update_time = -300, initTime = 0;
 mutex stateLock;
@@ -131,24 +140,88 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 	}
 	return newVesselList;
 }
-double slowUpdateLastsyst = 0;
-class SimpleAverageState {
-public:
-	VECTOR3 rpos;
-	int samples;
-	SimpleAverageState::SimpleAverageState() {
-		samples = 0;
-		rpos = _V(0, 0, 0);
+
+vector<ReconState> parseReconStates(string teleJson) {
+	Document d;
+	d.Parse(teleJson.c_str());
+	vector<ReconState> states;
+	if (d.IsArray()) {
+
+		ReconState rs;
+		for (unsigned int i = 0; i < d.Size(); i++)
+		{
+			rs.reference = d[i]["reference"].GetString();
+			rs.target = d[i]["target"].GetString();
+			rs.targetPosX = d[i]["targetPosX"].GetDouble();
+			rs.targetPosY = d[i]["targetPosY"].GetDouble();
+			rs.targetPosZ = d[i]["targetPosZ"].GetDouble();
+			rs.targetVelX = d[i]["targetVelX"].GetDouble();
+			rs.targetVelY = d[i]["targetVelY"].GetDouble();
+			rs.targetVelZ = d[i]["targetVelZ"].GetDouble();
+			rs.orientX = d[i]["orientX"].GetDouble();
+			rs.orientY = d[i]["orientY"].GetDouble();
+			rs.orientZ = d[i]["orientZ"].GetDouble();
+			rs.persisterId = d[i]["persisterId"].GetString();
+			rs.mjd = d[i]["mjd"].GetDouble();
+			states.push_back(rs);
+		}
 	}
-};
-map<string, vector<VECTOR3> > stateAverages;
-void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
+	return states;
+}
+
+double slowUpdateLastsyst = 0;
+
+bool areDocked(OBJHANDLE a, OBJHANDLE b) {
+	if (!oapiIsVessel(a) || !oapiIsVessel(b)) return false;
+	VESSEL* va = oapiGetVesselInterface(a);
+	VESSEL* vb = oapiGetVesselInterface(b);
+
+	for (unsigned int i = 0; i < va->DockCount(); i++) {
+		DOCKHANDLE d = va->GetDockHandle(i);
+		if (va->GetDockStatus(d) == b) return true;
+	}
+	return false;
+}
+
+map<string, double> lastReconUpdateForVessel;
+map<string, double> lastThrusterFireTime;
+double lastThrusterFireTimeCheckTime = 0;
+bool isVesselActive(VESSEL* v) {
+	string name = v->GetName();
+	if (lastThrusterFireTime.count(name) == 0) return false;
+	double syst = oapiGetSysTime();
+	if ((syst - lastThrusterFireTime[name]) >= 30) return false;
+	return true;
+}
+
+bool shouldSendReconState(VESSEL* focus, VESSEL* target) {
+	double pe;
+	focus->GetPeDist(pe);
+	bool docked = areDocked(focus->GetHandle(), target->GetHandle());
+	bool focusIsActive = isVesselActive(focus);
+	bool targetIsActive = isVesselActive(target);
+	return (focusIsActive && pe > 0) || (docked);
+}
+
+void updateOrbiterVessels(map<string, SimpleVesselState> vessels, vector<ReconState> reconIn, vector<ReconState>& reconOut)
 {
 	double syst = oapiGetSysTime();
+	double simdt = oapiGetSimStep();
+	double mjd = oapiGetSimMJD();
 	bool didSlowUpdate = false;
+	VESSEL* focus = oapiGetFocusInterface();
+	OBJHANDLE focushandle = focus->GetHandle();
+	VECTOR3 gpos, lpos, focusgpos;
+	double pe;
+	focus->GetPeDist(pe);
+	pe -= oapiGetSize(focus->GetSurfaceRef());
+	focus->GetGlobalPos(focusgpos);
 	for (auto it = vessels.begin(); it != vessels.end(); ++it) {
 		if (it->second.persisterId == persisterId) continue;
 		OBJHANDLE h = oapiGetVesselByName((char*)it->first.c_str());
+		if (lastReconUpdateForVessel.count(it->first) > 0) {
+			if (lastReconUpdateForVessel[it->first] < 3) continue;
+		}
 		VESSELSTATUS2 vs, vsold;
 		memset(&vs, 0, sizeof(VESSELSTATUS2));
 		vs.version = 2;
@@ -173,7 +246,6 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 			v->GetStatusEx(&vs);
 		}
 		else {
-			//oapiGetFocusInterface()->GetStatusEx(&vs);
 		}
 		SimpleVesselState state = it->second;
 		vs.status = state.landed ? 1 : 0;
@@ -182,43 +254,65 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 		vs.rvel.x = state.rvelx; vs.rvel.y = state.rvely; vs.rvel.z = state.rvelz;
 		vs.rpos.x = state.rposx; vs.rpos.y = state.rposy; vs.rpos.z = state.rposz;
 
-		double dt = (oapiGetSimMJD() - state.mjd) * 60 * 60 * 24;
+		double dt = ( mjd - state.mjd) * 60 * 60 * 24;
 		vs.surf_lat = state.lat;
 		vs.surf_lng = state.lon;
 		vs.surf_hdg = state.heading;
-		//vs.rpos += vs.rvel * dt;
 		if (v == NULL) {
 			std::string classname = "Deltaglider";
 			if (isVesselCompatible(state.className))
 				classname = state.className;
 			h = oapiCreateVesselEx(state.name.c_str(), classname.c_str(), &vs);
 			v = oapiGetVesselInterface(h);
+			continue;
 		}
+		VECTOR3 oldGpos, oldLpos, displacement, orientation;
+		v->GetGlobalPos(oldGpos);
+		focus->Global2Local(oldGpos, oldLpos);
 		v->DefSetStateEx(&vs);
 		v->GetStatusEx(&vs);
-
-		VECTOR3 vel;
+		VECTOR3 vel, rel, rvel, lvel;
+		MATRIX3 R;
 		v->GlobalRot(_V(state.accx*dt, state.accy*dt, state.accz*dt), vel);
 		vs.rvel += vel;
 		vs.rpos += vs.rvel * dt;
-		/*
-		if (stateAverages.count(state.name) == 0) {
-			vector<VECTOR3> pos;
-			pos.push_back(vs.rpos);
-			stateAverages[state.name] = pos;
-		}
-		else {
-			auto avgState = stateAverages[state.name];
-			avgState.push_back(vs.rpos);
-		}
-		auto avgState = stateAverages[state.name];
-		vector<VECTOR3> st(avgState.end() - 5, avgState.end());
-		VECTOR3 rpos = _V(0, 0, 0);
-		for (int i = 0; i < st.size(); i++)
-			rpos += st[i];
-		if (st.size() >= 50)
-			vs.rpos = rpos/st.size();*/
 		v->DefSetStateEx(&vs);
+		
+		if (length(oldLpos) < 10000 && shouldSendReconState(focus, v)) {
+			v->GetGlobalPos(gpos);
+			focus->Global2Local(gpos, lpos);
+			displacement = lpos - oldLpos;
+			v->GetRelativeVel(focus->GetHandle(), rvel);
+			v->GetRotationMatrix(R);
+			lvel = tmul(R, rvel);
+			if ((length(displacement) > length(rvel)*simdt) || areDocked(focushandle, v->GetHandle())) {
+				VECTOR3 avg = (lpos + oldLpos) / 2.0;
+				avg = oldLpos;
+				focus->Local2Rel(avg, rel);
+				vs.rpos = rel;
+				v->DefSetStateEx(&vs);
+				// create recon event
+				//avg *= -1;
+				//avg.z *= -1;
+				v->Global2Local(focusgpos, avg);
+				ReconState rs;
+				rs.mjd = mjd;
+				rs.reference = v->GetName();
+				rs.target = focus->GetName();
+				rs.targetPosX = avg.x;
+				rs.targetPosY = avg.y;
+				rs.targetPosZ = avg.z;
+				rs.targetVelX = lvel.x;
+				rs.targetVelY = lvel.y;
+				rs.targetVelZ = lvel.z;
+				focus->GetGlobalOrientation(orientation);
+				rs.orientX = orientation.x;
+				rs.orientY = orientation.y;
+				rs.orientZ = orientation.z;
+				rs.persisterId = persisterId;
+				reconOut.push_back(rs);
+			}
+		}
 		v->SetAngularVel(_V(state.angx, state.angy, state.angz));
 		/*
 		if (avgState.size() > 200) {
@@ -230,9 +324,74 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels)
 		v->SetThrusterGroupLevel(THGROUP_RETRO, state.retro);
 		v->ActivateNavmode(NAVMODE_KILLROT);
 	}
+	OBJHANDLE ref, target;
+	double dt;
+	VECTOR3 pos, vel;
+	VESSEL* v;
+	VESSELSTATUS vs;
+	for (unsigned int i = 0; i < reconIn.size(); i++) {
+		auto s = reconIn[i];
+		if (s.persisterId == persisterId) continue;
+		
+		dt = (mjd - s.mjd) * 60 * 60 * 24;
+		ref = oapiGetVesselByName((char*)s.reference.c_str());
+		if (!oapiIsVessel(ref)) continue;
+		if (focushandle != ref) continue;
+		target = oapiGetVesselByName((char*)s.target.c_str());
+		if (!oapiIsVessel(target)) continue;
+		v = oapiGetVesselInterface(ref);
+		v->Local2Rel(_V(s.targetPosX, s.targetPosY, s.targetPosZ), pos);
+		v->GlobalRot(_V(s.targetVelX, s.targetVelY, s.targetVelZ), vel);
+		v = oapiGetVesselInterface(target);
+		memset(&vs, 0, sizeof(VESSELSTATUS));
+		v->GetStatus(vs);
+		vs.rpos = pos;
+		v->DefSetState(&vs);
+		// TODO- decide whether we should do this
+		v->GetStatus(vs);
+		vs.rpos += vel * dt;
+		v->DefSetState(&vs);
+		lastReconUpdateForVessel[s.target] = syst;
+		v->SetGlobalOrientation(_V(s.orientX, s.orientY, s.orientZ));
+	}
 	if (didSlowUpdate) {
 		slowUpdateLastsyst = syst;
 	}
+}
+
+string serializeReconStates(vector<ReconState> states)
+{
+	Document d;
+	d.SetArray();
+	Document::AllocatorType& a = d.GetAllocator();
+	for (unsigned int i = 0; i < states.size(); i++)
+	{
+		Value v("state");
+		v.SetObject();
+		ReconState s = states[i];
+		v.AddMember("mjd", s.mjd, a);
+		Value valr(s.reference.c_str(), a);
+		v.AddMember("reference", valr, a);
+		valr = Value(s.target.c_str(), a);
+		v.AddMember("target", valr, a);
+		v.AddMember("targetPosX", s.targetPosX, a);
+		v.AddMember("targetPosY", s.targetPosY, a);
+		v.AddMember("targetPosZ", s.targetPosZ, a);
+		v.AddMember("targetVelX", s.targetVelX, a);
+		v.AddMember("targetVelY", s.targetVelY, a);
+		v.AddMember("targetVelZ", s.targetVelZ, a);
+		v.AddMember("orientX", s.orientX, a);
+		v.AddMember("orientY", s.orientY, a);
+		v.AddMember("orientZ", s.orientZ, a);
+		valr = Value(persisterId.c_str(), a);
+		v.AddMember("persisterId", valr, a);
+		d.PushBack(v, a);
+	}
+	GenericStringBuffer<UTF8<>> sbuf;
+	Writer<GenericStringBuffer<UTF8<>>> writer(sbuf);
+	d.Accept(writer);
+	std::string str = sbuf.GetString();
+	return str;
 }
 
 void proc()
@@ -240,9 +399,16 @@ void proc()
 	while (true) {
 		string resp = curl_get("http://orbiter.world/tele");
 		map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
-
 		stateLock.lock();
+		vector<ReconState> reconStatesOut = reconOutStates;
+		reconOutStates.clear();
 		serverVesselList = newVesselList;
+		stateLock.unlock();
+
+		resp = curl_post("http://orbiter.world/recon", serializeReconStates(reconStatesOut));
+		vector<ReconState> reconIn = parseReconStates(resp);
+		stateLock.lock();
+		reconInStates = reconIn;
 		stateLock.unlock();
 
 		Sleep(SHORT_POLL * 1000.);
@@ -279,8 +445,10 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 	
 	if ((syst > last_update_time + SHORT_POLL) && first && (syst-initTime) > 2) {
 		map<string, SimpleVesselState> newVesselList;
+		vector<ReconState> newReconEvents, reconOut;
 		stateLock.lock();
 		newVesselList = serverVesselList;
+		newReconEvents = reconInStates;
 		stateLock.unlock();
 		if (newVesselList.size() > 0) {
 			for (auto it = vesselList.begin(); it != vesselList.end(); ++it)
@@ -294,7 +462,23 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			}
 		}
 		vesselList = newVesselList;
-		updateOrbiterVessels(vesselList);
+		updateOrbiterVessels(vesselList, newReconEvents, reconOut);
+		stateLock.lock();
+		reconOutStates = reconOut;
+		stateLock.unlock();
 		last_update_time = syst;
+	}
+	VESSEL* focus = oapiGetFocusInterface();
+	string name = focus->GetName();
+	if (lastThrusterFireTime.count(name) == 0)
+		lastThrusterFireTime[name] = 0;
+	if (lastThrusterFireTimeCheckTime + 0.1 < syst) {
+		for (unsigned int i = 0; i < focus->GetThrusterCount(); i++) {
+			if (focus->GetThrusterLevel(focus->GetThrusterHandleByIndex(i)) > 0) {
+				lastThrusterFireTime[name] = syst;
+				break;
+			}
+		}
+		lastThrusterFireTimeCheckTime = syst;
 	}
 }
