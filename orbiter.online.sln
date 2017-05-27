@@ -17,6 +17,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ServerPersister", "ServerPe
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ClientPersister", "ClientPersister\ClientPersister.vcxproj", "{9B71137C-BB9D-4FCB-9160-002F76A3F4E7}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RaceCheckpointMFD", "RaceCheckpointMFD\RaceCheckpointMFD.vcxproj", "{8FEDD0E5-9748-47D2-AD01-04317CC8F4B7}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ORL_CHKPT", "ORL_CHKPT\ORL_CHKPT.vcxproj", "{B2DEADAE-DFC1-4580-AB14-3E374D50D03C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -79,6 +83,18 @@ Global
 		{9B71137C-BB9D-4FCB-9160-002F76A3F4E7}.Release|x64.Build.0 = Release|x64
 		{9B71137C-BB9D-4FCB-9160-002F76A3F4E7}.Release|x86.ActiveCfg = Release|Win32
 		{9B71137C-BB9D-4FCB-9160-002F76A3F4E7}.Release|x86.Build.0 = Release|Win32
+		{8FEDD0E5-9748-47D2-AD01-04317CC8F4B7}.Debug|x64.ActiveCfg = Debug|Win32
+		{8FEDD0E5-9748-47D2-AD01-04317CC8F4B7}.Debug|x86.ActiveCfg = Debug|Win32
+		{8FEDD0E5-9748-47D2-AD01-04317CC8F4B7}.Debug|x86.Build.0 = Debug|Win32
+		{8FEDD0E5-9748-47D2-AD01-04317CC8F4B7}.Release|x64.ActiveCfg = Release|Win32
+		{8FEDD0E5-9748-47D2-AD01-04317CC8F4B7}.Release|x86.ActiveCfg = Release|Win32
+		{8FEDD0E5-9748-47D2-AD01-04317CC8F4B7}.Release|x86.Build.0 = Release|Win32
+		{B2DEADAE-DFC1-4580-AB14-3E374D50D03C}.Debug|x64.ActiveCfg = Debug|Win32
+		{B2DEADAE-DFC1-4580-AB14-3E374D50D03C}.Debug|x86.ActiveCfg = Debug|Win32
+		{B2DEADAE-DFC1-4580-AB14-3E374D50D03C}.Debug|x86.Build.0 = Debug|Win32
+		{B2DEADAE-DFC1-4580-AB14-3E374D50D03C}.Release|x64.ActiveCfg = Release|Win32
+		{B2DEADAE-DFC1-4580-AB14-3E374D50D03C}.Release|x86.ActiveCfg = Release|Win32
+		{B2DEADAE-DFC1-4580-AB14-3E374D50D03C}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

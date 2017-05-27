@@ -26,7 +26,7 @@ class SimpleVesselState
 {
 public:
 	bool landed;
-	string refplanet, name, className, persisterId;
+	string refplanet, name, className, persisterId, originalPersister;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
 		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz;
 };
@@ -115,6 +115,8 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 			s.angx = d[i]["angx"].GetDouble();
 			s.angy = d[i]["angy"].GetDouble();
 			s.angz = d[i]["angz"].GetDouble();
+			if (d[i].HasMember("originalPersister"))
+				s.originalPersister = d[i]["originalPersister"].GetString();
 			newVesselList[name] = s;
 		}
 	}
@@ -165,6 +167,8 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		v.AddMember("name", valr, a);
 		valr = Value(persisterId.c_str(), a);
 		v.AddMember("persisterId", valr, a);
+		valr = Value(s.originalPersister.c_str(), a);
+		v.AddMember("originalPersister", valr, a);
 		d.PushBack(v, a);
 	}
 	GenericStringBuffer<UTF8<>> sbuf;
@@ -176,13 +180,13 @@ string getTele(map<string, SimpleVesselState> vessels) {
 
 void proc()
 {
-	Sleep(5000);
+	Sleep(1000 * 20);
 	while (true) {
 		stateLock.lock();
 		map<string, SimpleVesselState> vesselStates = vesselList;
 		stateLock.unlock();
 		string teleStr = getTele(vesselStates);
-		string resp = curl_post("http://orbiter.world/posttele?pid=" + persisterId, teleStr);
+		string resp = curl_post("http://localhost:5000/posttele?pid=" + persisterId, teleStr);
 		map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
 
 		stateLock.lock();
@@ -204,12 +208,13 @@ DLLCLBK void InitModule(HINSTANCE hDLL)
 
 DLLCLBK void ExitModule(HINSTANCE hDLL)
 {
+	//curl_post("http://localhost:5000/persister/exit?pid=" + persisterId, "{}");
 	curl_clean();
 }
 
 DLLCLBK void opcCloseRenderViewport()
 {
-	//curl_post("http://orbiter.world/persister/exit?pid=" + persisterId, "{}");
+	curl_post("http://localhost:5000/persister/exit?pid=" + persisterId, "{}");
 }
 
 string getpersisterIdFromDisk() {
@@ -227,10 +232,13 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 		first = true;
 		persisterId = getpersisterIdFromDisk();
 		if (persisterId == "") {
-			persisterId = curl_get("http://orbiter.world/persister/register");
+			persisterId = curl_get("http://localhost:5000/persister/register");
 			FILE* persistFile = fopen("persisterId", "w");
 			fputs(persisterId.c_str(), persistFile);
 			fclose(persistFile);
+		}
+		else {
+			curl_get("http://localhost:5000/persister/init?pid=" + persisterId);
 		}
 		serverThread = new thread(proc);
 	}
@@ -367,6 +375,9 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 					OBJHANDLE v = oapiGetVesselByName((char*)it->first.c_str());
 					if (oapiIsVessel(v)) {
 						oapiDeleteVessel(v);
+						stateLock.lock();
+						vesselList.erase(it->first);
+						stateLock.unlock();
 					}
 				}
 			}
