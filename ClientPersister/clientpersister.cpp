@@ -28,7 +28,7 @@ DLLCLBK void InitModule(HINSTANCE hDLL)
 
 DLLCLBK void ExitModule(HINSTANCE hDLL)
 {
-	curl_clean();
+	//curl_clean();
 }
 
 
@@ -226,6 +226,8 @@ bool isVesselActive(VESSEL* v) {
 bool shouldSendReconState(VESSEL* focus, VESSEL* target) {
 	double pe;
 	focus->GetPeDist(pe);
+	double refSize = oapiGetSize(focus->GetSurfaceRef());
+	pe -= refSize;
 	bool focusIsActive = isVesselActive(focus);
 	//bool targetIsActive = isVesselActive(target);
 	return (focusIsActive && pe > 0);
@@ -488,31 +490,50 @@ string serializeDockEvents(vector<DockEvent> states)
 	return str;
 }
 
+void teleproc()
+{
+	string resp = curl_get("http://localhost:5000/tele");
+	map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
+	stateLock.lock();
+	serverVesselList = newVesselList;
+	stateLock.unlock();
+}
+
+void reconproc()
+{
+	stateLock.lock();
+	vector<ReconState> reconStatesOut = reconOutStates;
+	reconOutStates.clear();
+	stateLock.unlock();
+	string resp = curl_post("http://localhost:5000/recon", serializeReconStates(reconStatesOut));
+	vector<ReconState> reconIn = parseReconStates(resp);
+	stateLock.lock();
+	reconInStates = reconIn;
+	stateLock.unlock();
+}
+
+void dockproc()
+{
+	stateLock.lock();
+	vector<DockEvent> outDockEvents = dockEventsOut;
+	dockEventsOut.clear();
+	stateLock.unlock();
+	string resp = curl_post("http://localhost:5000/dock", serializeDockEvents(outDockEvents));
+	vector<DockEvent> dockIn = parseDockEvents(resp);
+	stateLock.lock();
+	dockEventsIn = dockIn;
+	stateLock.unlock();
+}
 void proc()
 {
+	Sleep(1000 * 20);
 	while (true) {
-		string resp = curl_get("http://orbiter.world/tele");
-		map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
-		stateLock.lock();
-		vector<ReconState> reconStatesOut = reconOutStates;
-		vector<DockEvent> outDockEvents = dockEventsOut;
-		dockEventsOut.clear();
-		reconOutStates.clear();
-		serverVesselList = newVesselList;
-		stateLock.unlock();
-
-		resp = curl_post("http://orbiter.world/recon", serializeReconStates(reconStatesOut));
-		vector<ReconState> reconIn = parseReconStates(resp);
-		stateLock.lock();
-		reconInStates = reconIn;
-		stateLock.unlock();
-
-		resp = curl_post("http://orbiter.world/dock", serializeDockEvents(outDockEvents));
-		vector<DockEvent> dockIn = parseDockEvents(resp);
-		stateLock.lock();
-		dockEventsIn = dockIn;
-		stateLock.unlock();
-
+		thread tele(teleproc);
+		thread recon(reconproc);
+		thread dock(dockproc);
+		tele.join();
+		recon.join();
+		dock.join();
 		Sleep(SHORT_POLL * 1000.);
 	}
 }
@@ -532,7 +553,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 		persisterInit = true;
 		persisterId = getpersisterIdFromDisk();
 		if (persisterId == "") {
-			persisterId = curl_get("http://orbiter.world/persister/register");
+			persisterId = curl_get("http://localhost:5000/persister/register");
 			FILE* persistFile = fopen("persisterId", "w");
 			fputs(persisterId.c_str(), persistFile);
 			fclose(persistFile);

@@ -18,8 +18,6 @@ app.get('/', function(req, res){
 });
 
 
-var telemetry = [];
-var tele_timestamp = {};
 var persisters = {};
 var newVessels = {};
 var reconStates = [];
@@ -84,6 +82,45 @@ app.get('/persister/register', function(req, res) {
   res.send(pid, 200);
 });
 
+function removeFromArray(arr, inxs) {
+  var i = arr.length;
+  inxs.sort();
+  while(i--) {
+    var k = inxs.pop();
+    if (k == null || typeof k  == 'undefined') break;
+    arr.splice(k, 1);
+  }
+  return arr;
+}
+
+app.get('/persister/init', function(req, res) {
+  var pid = req.query.pid;
+  var newStates = [];
+  var persisterKeys = Object.keys(persisters);
+  for (var k = 0; k < persisterKeys.length; k++) {
+    var key = persisterKeys[k];
+    var persister = persisters[key];
+    if (persister.length == 0) continue;
+
+    var vesselsToKeep = [];
+    for (var j = 0; j < persister.length; j++) {
+      var state = persister[j];
+      if (state.originalPersister != null && typeof state.originalPersister != 'undefined' && state.originalPersister == pid) {
+        delete state.originalPersister;
+        state.persisterId = pid;
+        newStates.push(state);
+      } else {
+        vesselsToKeep.push(state);
+      }
+    }
+    persisters[key] = vesselsToKeep;
+  }
+  console.log("new states: ");
+  console.log(newStates);
+  persisters[pid] = newStates;
+  res.send(pid, 200);
+});
+
 app.post('/persist', function(req, res){
   var persisterId;
   if (req.query.pid != null && persisters[req.query.pid] != null) {
@@ -111,9 +148,33 @@ app.post('/persister/exit', function(req, res) {
   var pid = req.query.pid;
   // TODO move the vessels to an existing persister..
   if (pid != null) {
-    console.log("deleting persister: " + pid);
-    persisters[pid] = [];
-    newVessels[req.query.pid] = [];
+    var persister = persisters[pid];
+    var persisterKeys = Object.keys(persisters);
+    for (var k = 0; k < persister.length; k++) {
+      if (persister[k].originalPersister == null || typeof persister[k].originalPersister == 'undefined' || persister[k].originalPersister == '')
+        persister[k].originalPersister = pid;
+    }
+    // go through persister list and find a free persister
+    var foundKey = null;
+    for (var k = 0; k < persisterKeys.length; k++) {
+      var key = persisterKeys[k];
+      if (key == pid) continue;
+      var per = persisters[key];
+      if (per.length == 0) continue;
+      foundKey = key;
+      break;
+    }
+    if (foundKey != null) {
+      for (var k = 0; k < persister.length; k++) {
+        persister[k].persisterId = foundKey;
+        persisters[foundKey].push(persister[k]);
+      }
+      console.log("deleting persister: " + pid);
+      console.log(persisters[foundKey]);
+      console.log(persister);
+      persisters[pid] = [];
+      newVessels[req.query.pid] = [];
+    }
   }
   res.send({}, 200);
 });
@@ -124,7 +185,7 @@ function reconPrune() {
   for(var k = 0; k < reconStates.length; k++) {
     var state = reconStates[k];
     var dt = (mjd - state.mjd) * 60 * 60 * 24;
-    if (dt < 8) {
+    if (dt < 4) {
       reconNew.push(state);
     }
   }
@@ -137,7 +198,7 @@ function dockPrune() {
   for(var k = 0; k < dockEvents.length; k++) {
     var state = dockEvents[k];
     var dt = (mjd - state.mjd) * 60 * 60 * 24;
-    if (dt < 10) {
+    if (dt < 4) {
       dockNew.push(state);
     }
   }
@@ -174,6 +235,23 @@ app.post('/posttele', function(req, res){
   if (vesselsToSpawn == null || Object.keys(vesselsToSpawn).length == 0) vesselsToSpawn = [];
   if (persisters[req.query.pid] == null || Object.keys(persisters[req.query.pid]).length == 0) 
     persisters[req.query.pid] = [];
+  var persisterKeys = Object.keys(persisters);
+  var newBody = [];
+  for(var k = 0; k < req.body.length; k++) {
+    var state = req.body[k];
+    var collision = false;
+    for (var j = 0; j < persisterKeys.length; j++) {
+      var key = persisterKeys[j];
+      if (key == req.query.pid) continue;
+      var persister = persisters[key];
+      for (var h = 0; h < persister.length; h++) {
+        if (persister[h].name == state.name) { collision = true; break; }
+      }
+      if (collision) break;
+    }
+    if (!collision) newBody.push(state);
+  }
+  req.body = newBody;
   var states = req.body.concat(vesselsToSpawn, persisters[req.query.pid]);
   states = flattenByGreatestMJD(states);
   var retStates = [];
