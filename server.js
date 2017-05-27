@@ -124,7 +124,7 @@ function reconPrune() {
   for(var k = 0; k < reconStates.length; k++) {
     var state = reconStates[k];
     var dt = (mjd - state.mjd) * 60 * 60 * 24;
-    if (dt < 2) {
+    if (dt < 8) {
       reconNew.push(state);
     }
   }
@@ -137,7 +137,7 @@ function dockPrune() {
   for(var k = 0; k < dockEvents.length; k++) {
     var state = dockEvents[k];
     var dt = (mjd - state.mjd) * 60 * 60 * 24;
-    if (dt < 4) {
+    if (dt < 10) {
       dockNew.push(state);
     }
   }
