@@ -32,7 +32,7 @@ string persisterId = "";
 void mjd_sync() {
 	while (true) {
 		DWORD tickCount = GetTickCount();
-		std::string req = curl_get("http://orbiter.world/mjd");
+		std::string req = curl_get("http://localhost:5000/mjd");
 		if (req == "") {
 			continue;
 		}
@@ -189,7 +189,7 @@ bool Persist(void *id, char *str, void *data)
 	string name = v->GetName();
 	states[name] = s;
 	string json = getTele(states);
-	curl_post("http://orbiter.world/persist?pid=" + persisterId, json);
+	curl_post("http://localhost:5000/persist?pid=" + persisterId, json);
 	return true;
 }
 double oldRMjd = 0;
@@ -200,7 +200,7 @@ DLLCLBK void opcPreStep (double simt, double simdt, double mjd)
 		first = true;
 		persisterId = getpersisterIdFromDisk();
 		if (persisterId == "") {
-			persisterId = curl_get("http://orbiter.world/persister/register");
+			persisterId = curl_get("http://localhost:5000/persister/register");
 			FILE* persistFile = fopen("persisterId", "w");
 			fputs(persisterId.c_str(), persistFile);
 			fclose(persistFile);

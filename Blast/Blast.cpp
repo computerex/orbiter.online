@@ -88,7 +88,7 @@ void BLAST::deleteMyself()
 	OBJHANDLE me = GetHandle();
 	oapiGetObjectName(me, name, 256);
 	if (!isLocal)
-		curl_get("http://orbiter.world/vessel/delete?name=" + string(name) + "&focus=" + oapiGetFocusInterface()->GetName());
+		curl_get("http://localhost:5000/vessel/delete?name=" + string(name) + "&focus=" + oapiGetFocusInterface()->GetName());
 	oapiDeleteVessel(me);
 }
 void BLAST::clbkPreStep(double simt, double simdt, double mjd)

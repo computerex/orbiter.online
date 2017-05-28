@@ -70,7 +70,7 @@ app.get('/tele', function(req, res){
     if (Object.keys(flattenedStates[k]) == 0) continue;
     var dt = (mjd - flattenedStates[k].mjd) * 60 * 60 * 24;
     if (dt > 3) {
-      console.log("ignoring state tele: " + dt);
+      console.log("ignoring state tele: " + dt + " mjd: " + mjd + " sv: " + flattenedStates[k].mjd);
       continue;
     }
     retStates.push(flattenedStates[k]);
@@ -277,6 +277,7 @@ app.post('/posttele', function(req, res){
     }
     for (var j = 0; j < persisterKeys.length; j++) {
       var key = persisterKeys[j];
+      if (key == req.query.pid) continue;
       var persister = persisters[key];
       for (var h = 0; h < persister.length; h++) {
         if (persister[h].name == state.name) { collision = true; break; }
