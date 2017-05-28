@@ -65,8 +65,11 @@ app.get('/tele', function(req, res){
   }
   var flattenedStates = flattenByGreatestMJD(tele);
   var retStates = [];
+  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
   for(var k = 0; k < flattenedStates.length; k++) {
     if (Object.keys(flattenedStates[k]) == 0) continue;
+    var dt = (mjd - flattenedStates[k].mjd) * 60 * 60 * 24;
+    if (dt > 3) continue;
     retStates.push(flattenedStates[k]);
   }
   res.send(retStates, 200);
@@ -260,12 +263,14 @@ app.post('/posttele', function(req, res){
     persisters[req.query.pid] = [];
   var persisterKeys = Object.keys(persisters);
   var newBody = [];
+  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
   for(var k = 0; k < req.body.length; k++) {
     var state = req.body[k];
     var collision = false;
+    var dt = (mjd - state.mjd) * 60 * 60 * 24;
+    if (dt > 3) continue;
     for (var j = 0; j < persisterKeys.length; j++) {
       var key = persisterKeys[j];
-      if (key == req.query.pid) continue;
       var persister = persisters[key];
       for (var h = 0; h < persister.length; h++) {
         if (persister[h].name == state.name) { collision = true; break; }
@@ -273,18 +278,6 @@ app.post('/posttele', function(req, res){
       if (collision) break;
     }
     if (!collision) newBody.push(state);
-  }
-  req.body = newBody;
-  newBody = [];
-  for (var j = 0; j < req.body.length; j++) {
-    var collision = false;
-    for (var k = 0; k < persisters[req.query.pid].length; k++) {
-      if (persisters[req.query.pid][k].name == req.body[j].name) {
-        collision = true;
-        break;
-      }
-    }
-    if (collision) newBody.push(req.body[j]);
   }
   req.body = newBody;
   var states = req.body.concat(vesselsToSpawn, persisters[req.query.pid]);

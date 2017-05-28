@@ -188,7 +188,7 @@ void proc()
 		map<string, SimpleVesselState> vesselStates = vesselList;
 		stateLock.unlock();
 		string teleStr = getTele(vesselStates);
-		string resp = curl_post("http://localhost:5000/posttele?pid=" + persisterId, teleStr);
+		string resp = curl_post("http://orbiter.world/posttele?pid=" + persisterId, teleStr);
 		map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
 
 		stateLock.lock();
@@ -210,13 +210,13 @@ DLLCLBK void InitModule(HINSTANCE hDLL)
 
 DLLCLBK void ExitModule(HINSTANCE hDLL)
 {
-	//curl_post("http://localhost:5000/persister/exit?pid=" + persisterId, "{}");
+	//curl_post("http://orbiter.world/persister/exit?pid=" + persisterId, "{}");
 	curl_clean();
 }
 
 DLLCLBK void opcCloseRenderViewport()
 {
-	curl_post("http://localhost:5000/persister/exit?pid=" + persisterId, "{}");
+	curl_post("http://orbiter.world/persister/exit?pid=" + persisterId, "{}");
 }
 
 string getpersisterIdFromDisk() {
@@ -234,13 +234,13 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 		first = true;
 		persisterId = getpersisterIdFromDisk();
 		if (persisterId == "") {
-			persisterId = curl_get("http://localhost:5000/persister/register");
+			persisterId = curl_get("http://orbiter.world/persister/register");
 			FILE* persistFile = fopen("persisterId", "w");
 			fputs(persisterId.c_str(), persistFile);
 			fclose(persistFile);
 		}
 		else {
-			curl_get("http://localhost:5000/persister/init?pid=" + persisterId);
+			curl_get("http://orbiter.world/persister/init?pid=" + persisterId);
 		}
 		serverThread = new thread(proc);
 	}

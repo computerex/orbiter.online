@@ -315,6 +315,7 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels,
 			continue;
 		}
 		if (it->second.className == "Blast") continue;
+		if (dt > 3) continue;
 		VECTOR3 oldGpos, oldLpos, displacement, orientation;
 		v->GetGlobalPos(oldGpos);
 		focus->Global2Local(oldGpos, oldLpos);
@@ -513,7 +514,7 @@ string serializeDockEvents(vector<DockEvent> states)
 
 void teleproc()
 {
-	string resp = curl_get("http://localhost:5000/tele");
+	string resp = curl_get("http://orbiter.world/tele");
 	map<string, SimpleVesselState> newVesselList = parseVesselStates(resp);
 	stateLock.lock();
 	serverVesselList = newVesselList;
@@ -526,7 +527,7 @@ void reconproc()
 	vector<ReconState> reconStatesOut = reconOutStates;
 	reconOutStates.clear();
 	stateLock.unlock();
-	string resp = curl_post("http://localhost:5000/recon", serializeReconStates(reconStatesOut));
+	string resp = curl_post("http://orbiter.world/recon", serializeReconStates(reconStatesOut));
 	vector<ReconState> reconIn = parseReconStates(resp);
 	stateLock.lock();
 	reconInStates = reconIn;
@@ -539,7 +540,7 @@ void dockproc()
 	vector<DockEvent> outDockEvents = dockEventsOut;
 	dockEventsOut.clear();
 	stateLock.unlock();
-	string resp = curl_post("http://localhost:5000/dock", serializeDockEvents(outDockEvents));
+	string resp = curl_post("http://orbiter.world/dock", serializeDockEvents(outDockEvents));
 	vector<DockEvent> dockIn = parseDockEvents(resp);
 	stateLock.lock();
 	dockEventsIn = dockIn;
@@ -574,7 +575,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 		persisterInit = true;
 		persisterId = getpersisterIdFromDisk();
 		if (persisterId == "") {
-			persisterId = curl_get("http://localhost:5000/persister/register");
+			persisterId = curl_get("http://orbiter.world/persister/register");
 			FILE* persistFile = fopen("persisterId", "w");
 			fputs(persisterId.c_str(), persistFile);
 			fclose(persistFile);
