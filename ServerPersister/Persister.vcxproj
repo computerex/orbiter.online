@@ -138,6 +138,11 @@
     <Library Include="..\..\..\lib\orbiter.lib" />
     <Library Include="..\..\..\lib\Orbitersdk.lib" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\curlhelper\curlhelper.vcxproj">
+      <Project>{d9e5d02d-c250-4344-a9f8-810c077bc8b1}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

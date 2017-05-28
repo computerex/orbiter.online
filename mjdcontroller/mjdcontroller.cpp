@@ -72,7 +72,7 @@ public:
 	bool landed;
 	string refplanet, name, className, persisterId;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
-		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz;
+		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz, propMass;
 };
 
 DLLCLBK void ExitModule (HINSTANCE hDLL)
@@ -125,6 +125,7 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		v.AddMember("angx", s.angx, a);
 		v.AddMember("angy", s.angy, a);
 		v.AddMember("angz", s.angz, a);
+		v.AddMember("propMass", s.propMass, a);
 		d.PushBack(v, a);
 	}
 	GenericStringBuffer<UTF8<>> sbuf;
@@ -182,6 +183,7 @@ bool Persist(void *id, char *str, void *data)
 	s.angx = avel.x;
 	s.angy = avel.y;
 	s.angz = avel.z;
+	s.propMass = v->GetFuelMass();
 
 	map<string, SimpleVesselState> states;
 	string name = v->GetName();

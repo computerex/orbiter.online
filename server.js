@@ -121,6 +121,29 @@ app.get('/persister/init', function(req, res) {
   res.send(pid, 200);
 });
 
+app.get('/vessel/delete', function(req, res){
+  var vesselToDelete = req.query.name;
+  console.log("delete vessel: " + vesselToDelete + " focus: " + req.query.focus);
+  var persisterKeys = Object.keys(persisters);
+  for(var k = 0; k < persisterKeys.length; k++) {
+    var key = persisterKeys[k];
+    var persister = persisters[key];
+    var i = persister.length;
+    var persisterNew = [];
+    while(i--) {
+      var state = persister[i];
+      if (state.name == vesselToDelete) {
+        console.log("deleting state: ");
+        console.log(state);
+        persister.splice(i, 1);
+      }
+      else persisterNew.push(state);
+    }
+    persisters[key] = persisterNew;
+  }
+  res.send({}, 200);
+});
+
 app.post('/persist', function(req, res){
   var persisterId;
   if (req.query.pid != null && persisters[req.query.pid] != null) {
@@ -252,6 +275,18 @@ app.post('/posttele', function(req, res){
     if (!collision) newBody.push(state);
   }
   req.body = newBody;
+  newBody = [];
+  for (var j = 0; j < req.body.length; j++) {
+    var collision = false;
+    for (var k = 0; k < persisters[req.query.pid].length; k++) {
+      if (persisters[req.query.pid][k].name == req.body[j].name) {
+        collision = true;
+        break;
+      }
+    }
+    if (collision) newBody.push(req.body[j]);
+  }
+  req.body = newBody;
   var states = req.body.concat(vesselsToSpawn, persisters[req.query.pid]);
   states = flattenByGreatestMJD(states);
   var retStates = [];
@@ -261,6 +296,7 @@ app.post('/posttele', function(req, res){
   }
   //if (states != null && Object.keys(states).length != 0)
   persisters[req.query.pid] = retStates;
+  newVessels[req.query.pid] = [];
   res.send(persisters[req.query.pid], 200);
 });
 

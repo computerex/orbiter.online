@@ -38,7 +38,7 @@ public:
 	bool landed;
 	string refplanet, name, className, persisterId;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
-		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz;
+		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz, propMass;
 };
 
 class ReconState {
@@ -141,6 +141,7 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 			s.angx = d[i]["angx"].GetDouble();
 			s.angy = d[i]["angy"].GetDouble();
 			s.angz = d[i]["angz"].GetDouble();
+			s.propMass = d[i]["propMass"].GetDouble();
 			s.persisterId = d[i]["persisterId"].GetString();
 			newVesselList[name] = s;
 		}
@@ -284,81 +285,101 @@ void updateOrbiterVessels(map<string, SimpleVesselState> vessels,
 		else {
 		}
 		SimpleVesselState state = it->second;
-		vs.status = state.landed ? 1 : 0;
-		vs.rbody = oapiGetGbodyByName((char*)state.refplanet.c_str());
-		vs.arot.x = state.arotx; vs.arot.y = state.aroty; vs.arot.z = state.arotz;
-		vs.rvel.x = state.rvelx; vs.rvel.y = state.rvely; vs.rvel.z = state.rvelz;
-		vs.rpos.x = state.rposx; vs.rpos.y = state.rposy; vs.rpos.z = state.rposz;
 
+		if (state.landed) {
+			memset(&vs, 0, sizeof(vs));
+			vs.version = 2;
+			vs.arot.x = 10;
+			vs.rbody = oapiGetGbodyByName((char*)state.refplanet.c_str());
+			vs.status = 1;
+		}
+		else {
+			vs.rbody = oapiGetGbodyByName((char*)state.refplanet.c_str());
+			vs.arot.x = state.arotx; vs.arot.y = state.aroty; vs.arot.z = state.arotz;
+			vs.rvel.x = state.rvelx; vs.rvel.y = state.rvely; vs.rvel.z = state.rvelz;
+			vs.rpos.x = state.rposx; vs.rpos.y = state.rposy; vs.rpos.z = state.rposz;
+			vs.status = 0;
+		}
 		double dt = ( mjd - state.mjd) * 60 * 60 * 24;
 		vs.surf_lat = state.lat;
 		vs.surf_lng = state.lon;
 		vs.surf_hdg = state.heading;
+		
 		if (v == NULL) {
 			std::string classname = "Deltaglider";
 			if (isVesselCompatible(state.className))
 				classname = state.className;
 			h = oapiCreateVesselEx(state.name.c_str(), classname.c_str(), &vs);
 			v = oapiGetVesselInterface(h);
+			//((VESSEL2*)v)->clbkConsumeBufferedKey(OAPI_KEY_G, true, NULL);
 			continue;
 		}
+		if (it->second.className == "Blast") continue;
 		VECTOR3 oldGpos, oldLpos, displacement, orientation;
 		v->GetGlobalPos(oldGpos);
 		focus->Global2Local(oldGpos, oldLpos);
 		v->DefSetStateEx(&vs);
-		v->GetStatusEx(&vs);
-		VECTOR3 vel, rel, rvel, lvel;
-		MATRIX3 R;
-		v->GlobalRot(_V(state.accx*dt, state.accy*dt, state.accz*dt), vel);
-		vs.rvel += vel;
-		vs.rpos += vs.rvel * dt;
-		v->DefSetStateEx(&vs);
-		
-		if (length(oldLpos) < 10000 && shouldSendReconState(focus, v)) {
-			v->GetGlobalPos(gpos);
-			focus->Global2Local(gpos, lpos);
-			displacement = lpos - oldLpos;
-			v->GetRelativeVel(focus->GetHandle(), rvel);
-			v->GetRotationMatrix(R);
-			lvel = tmul(R, rvel);
-			if ((length(displacement) > length(rvel)*simdt)) {
-				VECTOR3 avg = (lpos + oldLpos) / 2.0;
-				avg = oldLpos;
-				focus->Local2Rel(avg, rel);
-				vs.rpos = rel;
-				v->DefSetStateEx(&vs);
-				// create recon event
-				//avg *= -1;
-				//avg.z *= -1;
-				v->Global2Local(focusgpos, avg);
-				ReconState rs;
-				rs.mjd = mjd;
-				rs.reference = v->GetName();
-				rs.target = focus->GetName();
-				rs.targetPosX = avg.x;
-				rs.targetPosY = avg.y;
-				rs.targetPosZ = avg.z;
-				rs.targetVelX = lvel.x;
-				rs.targetVelY = lvel.y;
-				rs.targetVelZ = lvel.z;
-				focus->GetGlobalOrientation(orientation);
-				rs.orientX = orientation.x;
-				rs.orientY = orientation.y;
-				rs.orientZ = orientation.z;
-				rs.persisterId = persisterId;
-				reconOut.push_back(rs);
-			}
-		}
-		v->SetAngularVel(_V(state.angx, state.angy, state.angz));
-		/*
-		if (avgState.size() > 200) {
-			vector<VECTOR3> st(avgState.end() - 5, avgState.end());
-			avgState = st;
-		}*/
 		v->SetThrusterGroupLevel(THGROUP_MAIN, state.main);
 		v->SetThrusterGroupLevel(THGROUP_HOVER, state.hover);
 		v->SetThrusterGroupLevel(THGROUP_RETRO, state.retro);
 		v->ActivateNavmode(NAVMODE_KILLROT);
+		if (!state.landed) {
+			v->GetStatusEx(&vs);
+			VECTOR3 vel, rel, rvel, lvel;
+			MATRIX3 R;
+			v->GlobalRot(_V(state.accx*dt, state.accy*dt, state.accz*dt), vel);
+			vs.rvel += vel;
+			vs.rpos += vs.rvel * dt;
+			v->DefSetStateEx(&vs);
+			v->SetAngularVel(_V(state.angx, state.angy, state.angz));
+			v->SetFuelMass(state.propMass);
+			if (length(oldLpos) < 10000 && shouldSendReconState(focus, v)) {
+				v->GetGlobalPos(gpos);
+				focus->Global2Local(gpos, lpos);
+				displacement = lpos - oldLpos;
+				v->GetRelativeVel(focus->GetHandle(), rvel);
+				v->GetRotationMatrix(R);
+				lvel = tmul(R, rvel);
+				if ((length(displacement) > length(rvel)*simdt)) {
+					VECTOR3 avg = (lpos + oldLpos) / 2.0;
+					avg = oldLpos;
+					focus->Local2Rel(avg, rel);
+					vs.rpos = rel;
+					v->DefSetStateEx(&vs);
+					// create recon event
+					//avg *= -1;
+					//avg.z *= -1;
+					v->Global2Local(focusgpos, avg);
+					ReconState rs;
+					rs.mjd = mjd;
+					rs.reference = v->GetName();
+					rs.target = focus->GetName();
+					rs.targetPosX = avg.x;
+					rs.targetPosY = avg.y;
+					rs.targetPosZ = avg.z;
+					rs.targetVelX = lvel.x;
+					rs.targetVelY = lvel.y;
+					rs.targetVelZ = lvel.z;
+					focus->GetGlobalOrientation(orientation);
+					rs.orientX = orientation.x;
+					rs.orientY = orientation.y;
+					rs.orientZ = orientation.z;
+					rs.persisterId = persisterId;
+					reconOut.push_back(rs);
+				}
+			}
+			else {
+				/*v->Global2Local(oldGpos, oldLpos);
+				VECTOR3 acc, force;
+				v->GetForceVector(force);
+				acc = force / v->GetMass();
+				if (length(oldLpos)) {
+					v->GetStatusEx(&vs);
+					v->Local2Rel(oldLpos, vs.rpos);
+					v->DefSetStateEx(&vs);
+				}*/
+			}
+		}
 	}
 	OBJHANDLE ref, target;
 	double dt;
@@ -526,7 +547,7 @@ void dockproc()
 }
 void proc()
 {
-	Sleep(1000 * 20);
+	Sleep(1000 * 5);
 	while (true) {
 		thread tele(teleproc);
 		thread recon(reconproc);

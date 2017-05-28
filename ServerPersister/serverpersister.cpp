@@ -28,7 +28,7 @@ public:
 	bool landed;
 	string refplanet, name, className, persisterId, originalPersister;
 	double lon, lat, rposx, rposy, rposz, rvelx, rvely, rvelz, arotx, aroty, arotz, heading,
-		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz;
+		retro, hover, main, mjd, accx, accy, accz, angx, angy, angz, propMass;
 };
 
 map<string, SimpleVesselState> vesselList, serverVesselList;
@@ -115,6 +115,7 @@ map<string, SimpleVesselState> parseVesselStates(string teleJson) {
 			s.angx = d[i]["angx"].GetDouble();
 			s.angy = d[i]["angy"].GetDouble();
 			s.angz = d[i]["angz"].GetDouble();
+			s.propMass = d[i]["propMass"].GetDouble();
 			if (d[i].HasMember("originalPersister"))
 				s.originalPersister = d[i]["originalPersister"].GetString();
 			newVesselList[name] = s;
@@ -132,10 +133,10 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		Value v("vessel");
 		v.SetObject();
 		SimpleVesselState s = it->second;
-		if (s.landed)
+		/*if (s.landed)
 		{
 			s.rposx = s.rposy = s.rposz = s.rvelx = s.rvely = s.rvelz = s.arotx = s.aroty = s.arotz = s.main = s.retro = s.hover = 0;
-		}
+		}*/
 		v.AddMember("landed", it->second.landed, a);
 		Value valr(s.refplanet.c_str(), a);
 		v.AddMember("refplanet", valr, a);
@@ -161,6 +162,7 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		v.AddMember("angx", s.angx, a);
 		v.AddMember("angy", s.angy, a);
 		v.AddMember("angz", s.angz, a);
+		v.AddMember("propMass", s.propMass, a);
 		valr = Value(s.className.c_str(), a);
 		v.AddMember("className", valr, a);
 		valr = Value(s.name.c_str(), a);
@@ -180,7 +182,7 @@ string getTele(map<string, SimpleVesselState> vessels) {
 
 void proc()
 {
-	Sleep(1000 * 20);
+	Sleep(1000 * 5);
 	while (true) {
 		stateLock.lock();
 		map<string, SimpleVesselState> vesselStates = vesselList;
@@ -271,7 +273,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			s.heading = vs.surf_hdg;
 			s.mjd = mjd;
 			s.hover = v->GetThrusterGroupLevel(THGROUP_HOVER);
-			s.landed = 0;
+			s.landed = vs.status == 1;
 			s.lat = vs.surf_lat;
 			s.lon = vs.surf_lng;
 			s.main = v->GetThrusterGroupLevel(THGROUP_MAIN);
@@ -294,6 +296,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			s.angx = avel.x;
 			s.angy = avel.y;
 			s.angz = avel.z;
+			s.propMass = v->GetFuelMass();
 			vesselList[s.name] = s;
 		}
 		map<string, SimpleVesselState> newVesselList = serverVesselList;
@@ -306,7 +309,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			vs.version = 2;
 			VESSEL *v = NULL;
 			SimpleVesselState state = it->second;
-			if (!oapiIsVessel(ves)) {
+			if (!oapiIsVessel(ves) && state.className != "Blast") {
 				vs.status = (int)(state.landed);
 				vs.rbody = oapiGetGbodyByName((char*)state.refplanet.c_str());
 				vs.arot.x = state.arotx; vs.arot.y = state.aroty; vs.arot.z = state.arotz;
@@ -321,7 +324,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 				ves = oapiCreateVesselEx(state.name.c_str(), classname.c_str(), &vs);
 				v = oapiGetVesselInterface(ves);
 			}
-			else {
+			else if (oapiIsVessel(ves)) {
 				v = oapiGetVesselInterface(ves);
 				v->GetStatusEx(&vs);
 				char buffer[256];
@@ -338,7 +341,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 				state.heading = vs.surf_hdg;
 				state.mjd = mjd;
 				state.hover = v->GetThrusterGroupLevel(THGROUP_HOVER);
-				state.landed = 0;
+				state.landed = vs.status == 1;
 				state.lat = vs.surf_lat;
 				state.lon = vs.surf_lng;
 				state.main = v->GetThrusterGroupLevel(THGROUP_MAIN);
@@ -350,6 +353,7 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 				state.rvelx = vs.rvel.x;
 				state.rvely = vs.rvel.y;
 				state.rvelz = vs.rvel.z;
+				state.propMass = v->GetFuelMass();
 				VECTOR3 acc, force, avel;
 				v->GetForceVector(force);
 				v->GetAngularVel(avel);

@@ -24,8 +24,4 @@
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
-  <ItemGroup>
-    <Library Include="..\..\..\lib\Orbitersdk.lib" />
-    <Library Include="..\..\..\lib\orbiter.lib" />
-  </ItemGroup>
 </Project>

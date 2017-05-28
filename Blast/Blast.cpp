@@ -3,6 +3,10 @@
 
 #include "Blast.h"
 #include <vector>
+#include <string>
+#include "curl.h"
+
+using namespace std;
 
 VECTOR3 negv(VECTOR3 a)
 {
@@ -26,11 +30,29 @@ public:
 
 BLAST::BLAST(OBJHANDLE hVessel, int flightmodel) : VESSEL2(hVessel, flightmodel)
 {
-	m_DRange=1; 
+	m_DRange=10; 
 	m_Blown =false;
-	m_vel = 5;
+	m_vel = 1000;
 	m_CreationTime=oapiGetSimTime();
 	m_ExplosionTime=m_DRange;
+	isLocal = false;
+	char name[256];
+	oapiGetObjectName(hVessel, name, 256);
+	string nameStr = name;
+	int pos = nameStr.find_first_of("_");
+	if (pos != string::npos) {
+		strcpy(this->target, nameStr.substr(0, pos).c_str());
+		ClearThrusterDefinitions();
+		PROPELLANT_HANDLE hpr = CreatePropellantResource(1);
+		THRUSTER_HANDLE    th = CreateThruster(_V(0, 0, 0), _V(0, 1, 0), 1e0, hpr, 500e50);
+		COLOUR4 col_d = { 0.9f,0.8f,1.0f,0.0f };
+		COLOUR4 col_s = { 1.9f,0.8f,1.0f,0.0f };
+		COLOUR4 col_a = { 0.0f,0.0f,0.0f,0.0f };
+		AddPointLight(_V(0, 0, 0), m_DRange * 10, 0.0, 0.0, 2e-3, col_d, col_s, col_a);
+		AddExhaust(th, 1, m_DRange / 2);
+		CreateThrusterGroup(&th, 1, THGROUP_MAIN);
+		SetThrusterGroupLevel(THGROUP_MAIN, 1);
+	}
 }
 int BLAST::clbkConsumeBufferedKey(DWORD key, bool down, char *kstate)
 {
@@ -38,7 +60,8 @@ int BLAST::clbkConsumeBufferedKey(DWORD key, bool down, char *kstate)
 
 	if (key==EVENT_RANGE_SET)
 	{
-		auto targetRange = *(TargetRange*)kstate;
+		isLocal = true;
+		/*auto targetRange = *(TargetRange*)kstate;
 		this->m_DRange = targetRange.range;
 		this->m_vel = targetRange.vel;
 		strcpy(target, targetRange.target);
@@ -51,13 +74,22 @@ int BLAST::clbkConsumeBufferedKey(DWORD key, bool down, char *kstate)
 		AddPointLight(_V(0, 0, 0), m_DRange*10, 0.0, 0.0, 2e-3, col_d, col_s, col_a);
 		AddExhaust(th, 1, m_DRange/2);
 		CreateThrusterGroup(&th, 1, THGROUP_MAIN);
-		SetThrusterGroupLevel(THGROUP_MAIN,1);
+		SetThrusterGroupLevel(THGROUP_MAIN,1);*/
 		return 1;
 	}
 	return 0;
 }
 void BLAST::clbkPostStep(double simt, double simdt, double mjd)
 {
+}
+void BLAST::deleteMyself()
+{
+	char name[256];
+	OBJHANDLE me = GetHandle();
+	oapiGetObjectName(me, name, 256);
+	if (!isLocal)
+		curl_get("http://localhost:5000/vessel/delete?name=" + string(name) + "&focus=" + oapiGetFocusInterface()->GetName());
+	oapiDeleteVessel(me);
 }
 void BLAST::clbkPreStep(double simt, double simdt, double mjd)
 {
@@ -69,7 +101,7 @@ void BLAST::clbkPreStep(double simt, double simdt, double mjd)
 	OBJHANDLE target = oapiGetObjectByName(this->target);
 	if (target == NULL) { 
 		if (lifetime > 1) {
-			oapiDeleteVessel(GetHandle());
+			deleteMyself();
 		}
 		return; 
 	}
@@ -94,7 +126,7 @@ void BLAST::clbkPreStep(double simt, double simdt, double mjd)
 	{
 		//oapiDeleteVessel(target);
 		Damage(target);
-		oapiDeleteVessel(GetHandle());
+		deleteMyself();
 		return;
 	}
 
@@ -103,7 +135,7 @@ void BLAST::clbkPreStep(double simt, double simdt, double mjd)
 	l = _V(m.m13, m.m23, m.m33);			
 	
 	GetRelativeVel(target, rv);
-	if (dotp(g, n) < 0 && lifetime > 1) { strcpy(this->target, ""); return; }	//TODO: make missile targeting angle a server-set constant
+	if (dotp(g, n) < 0 && lifetime > 5) { strcpy(this->target, ""); return; }	//TODO: make missile targeting angle a server-set constant
 																		//Head towards target
 	//Current direction vector
 	normalise(g);										//Target direction vector, also	Matrix Z vector	

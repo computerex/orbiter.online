@@ -18,6 +18,7 @@ public:
 	void   Damage(OBJHANDLE hTarget);
 	void   Damage();
 	void Physics();
+	void deleteMyself();
 private:
 	double m_DRange;
 	double m_vel;
@@ -25,5 +26,6 @@ private:
 	double m_CreationTime;
 	double m_ExplosionTime;
 	char target[256];
+	bool isLocal;
 };
 #endif
