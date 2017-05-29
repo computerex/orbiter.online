@@ -27,5 +27,6 @@ private:
 	double m_ExplosionTime;
 	char target[256];
 	bool isLocal;
+	bool init;
 };
 #endif

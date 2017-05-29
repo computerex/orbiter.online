@@ -36,23 +36,7 @@ BLAST::BLAST(OBJHANDLE hVessel, int flightmodel) : VESSEL2(hVessel, flightmodel)
 	m_CreationTime=oapiGetSimTime();
 	m_ExplosionTime=m_DRange;
 	isLocal = false;
-	char name[256];
-	oapiGetObjectName(hVessel, name, 256);
-	string nameStr = name;
-	int pos = nameStr.find_first_of("_");
-	if (pos != string::npos) {
-		strcpy(this->target, nameStr.substr(0, pos).c_str());
-		ClearThrusterDefinitions();
-		PROPELLANT_HANDLE hpr = CreatePropellantResource(1);
-		THRUSTER_HANDLE    th = CreateThruster(_V(0, 0, 0), _V(0, 1, 0), 1e0, hpr, 500e50);
-		COLOUR4 col_d = { 0.9f,0.8f,1.0f,0.0f };
-		COLOUR4 col_s = { 1.9f,0.8f,1.0f,0.0f };
-		COLOUR4 col_a = { 0.0f,0.0f,0.0f,0.0f };
-		AddPointLight(_V(0, 0, 0), m_DRange * 10, 0.0, 0.0, 2e-3, col_d, col_s, col_a);
-		AddExhaust(th, 1, m_DRange / 2);
-		CreateThrusterGroup(&th, 1, THGROUP_MAIN);
-		SetThrusterGroupLevel(THGROUP_MAIN, 1);
-	}
+	init = false;
 }
 int BLAST::clbkConsumeBufferedKey(DWORD key, bool down, char *kstate)
 {
@@ -93,6 +77,39 @@ void BLAST::deleteMyself()
 }
 void BLAST::clbkPreStep(double simt, double simdt, double mjd)
 {
+	if (!init) {
+		init = true;
+		char name[256];
+		oapiGetObjectName(GetHandle(), name, 256);
+		string nameStr = name;
+		int pos = nameStr.find_first_of("_");
+		if (pos != string::npos) {
+			int pos2 = nameStr.find_last_of("_");
+			strcpy(this->target, nameStr.substr(0, pos).c_str());
+			char focus[256];
+			if (pos2 != string::npos && pos2 != pos) {
+				strcpy(focus, nameStr.substr(pos + 1, pos2 - pos - 1).c_str());
+				OBJHANDLE hv = oapiGetVesselByName(focus);
+				if (oapiIsVessel(hv)) {
+					VESSEL* f = oapiGetVesselInterface(hv);
+					VESSELSTATUS vs;
+					f->GetStatus(vs);
+					vs.status = 0;
+					DefSetState(&vs);
+				}
+			}
+			ClearThrusterDefinitions();
+			PROPELLANT_HANDLE hpr = CreatePropellantResource(1);
+			THRUSTER_HANDLE    th = CreateThruster(_V(0, 0, 0), _V(0, 1, 0), 1e0, hpr, 500e50);
+			COLOUR4 col_d = { 0.9f,0.8f,1.0f,0.0f };
+			COLOUR4 col_s = { 1.9f,0.8f,1.0f,0.0f };
+			COLOUR4 col_a = { 0.0f,0.0f,0.0f,0.0f };
+			AddPointLight(_V(0, 0, 0), m_DRange * 10, 0.0, 0.0, 2e-3, col_d, col_s, col_a);
+			AddExhaust(th, 1, m_DRange / 2);
+			CreateThrusterGroup(&th, 1, THGROUP_MAIN);
+			SetThrusterGroupLevel(THGROUP_MAIN, 1);
+		}
+	}
 	double lifetime = (simt - m_CreationTime);
 	VECTOR3 fVector;
 	GetWeightVector(fVector);

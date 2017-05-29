@@ -137,6 +137,7 @@ string getTele(map<string, SimpleVesselState> vessels) {
 		{
 			s.rposx = s.rposy = s.rposz = s.rvelx = s.rvely = s.rvelz = s.arotx = s.aroty = s.arotz = s.main = s.retro = s.hover = 0;
 		}*/
+		if (s.className == "Blast") continue;
 		v.AddMember("landed", it->second.landed, a);
 		Value valr(s.refplanet.c_str(), a);
 		v.AddMember("refplanet", valr, a);
@@ -375,8 +376,11 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			// delete vessels that no longer should be here
 			for (auto it = localVessels.begin(); it != localVessels.end(); ++it)
 			{
+				if (it->second.persisterId == persisterId) continue;
 				if (newVesselList.count(it->first) == 0) {
 					OBJHANDLE v = oapiGetVesselByName((char*)it->first.c_str());
+					double dt = (mjd - it->second.mjd) * 60 * 60 * 24;
+					if (dt < 5) continue;
 					if (oapiIsVessel(v)) {
 						oapiDeleteVessel(v);
 						stateLock.lock();

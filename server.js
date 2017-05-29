@@ -71,6 +71,7 @@ app.get('/tele', function(req, res){
     var dt = (mjd - flattenedStates[k].mjd) * 60 * 60 * 24;
     if (dt > 3) {
       console.log("ignoring state tele: " + dt + " mjd: " + mjd + " sv: " + flattenedStates[k].mjd);
+      console.log(flattenedStates[k]);
       continue;
     }
     retStates.push(flattenedStates[k]);
@@ -234,6 +235,23 @@ function dockPrune() {
   dockEvents = dockNew;
 }
 
+function persisterPrune() {
+  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
+  var persisterKeys = Object.keys(persisters);
+  for(var k = 0; k < persisterKeys.length; k++) {
+    var key = persisterKeys[k];
+    var persister = persisters[key];
+    var newPersister = [];
+    for(var j = 0; j < persister.length; j++) {
+      var state = persister[j];
+      var dt = (mjd - state.mjd) * 60 * 60 * 24;
+      if (dt > 5 && state.className == "Blast") continue;
+      newPersister.push(state);
+    }
+    persisters[key] = newPersister;
+  }
+}
+
 app.post('/recon', function(req, res) {
   var copyRecon = JSON.parse(JSON.stringify(reconStates));
   for(var k = 0; k < req.body.length; k++) {
@@ -272,7 +290,8 @@ app.post('/posttele', function(req, res){
     var collision = false;
     var dt = (mjd - state.mjd) * 60 * 60 * 24;
     if (dt > 3) {
-      console.log("ignoring state posttele: " + dt);
+      console.log("ignoring state posttele: " + dt + " mjd: " + mjd + " sv: " + state.mjd);
+      console.log(state);
       continue;
     }
     for (var j = 0; j < persisterKeys.length; j++) {
@@ -306,4 +325,5 @@ console.log("magic happens on port 5000\n");
 
 setInterval(reconPrune, 2000);
 setInterval(dockPrune, 2000);
+setInterval(persisterPrune, 2000);
 app.listen(5000);

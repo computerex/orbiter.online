@@ -601,6 +601,8 @@ DLLCLBK void opcPreStep(double simt, double simdt, double mjd) {
 			for (auto it = vesselList.begin(); it != vesselList.end(); ++it)
 			{
 				if (newVesselList.count(it->first) == 0) {
+					double dt = (mjd - it->second.mjd) * 60 * 60 * 24;
+					if (dt < 5) continue;
 					OBJHANDLE v = oapiGetVesselByName((char*)it->first.c_str());
 					if (oapiIsVessel(v)) {
 						oapiDeleteVessel(v);
