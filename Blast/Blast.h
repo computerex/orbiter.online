@@ -28,5 +28,6 @@ private:
 	char target[256];
 	bool isLocal;
 	bool init;
+	double last_update;
 };
 #endif

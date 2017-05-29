@@ -22,6 +22,12 @@ var persisters = {};
 var newVessels = {};
 var reconStates = [];
 var dockEvents = [];
+var onlinePersisters = [];
+
+function curmjd() {
+  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
+  return mjd;
+}
 
 function flattenByGreatestMJD(states) {
   var nameToStateHash = {};
@@ -69,7 +75,7 @@ app.get('/tele', function(req, res){
   for(var k = 0; k < flattenedStates.length; k++) {
     if (Object.keys(flattenedStates[k]) == 0) continue;
     var dt = (mjd - flattenedStates[k].mjd) * 60 * 60 * 24;
-    if (dt > 3) {
+    if (dt > 10) {
       console.log("ignoring state tele: " + dt + " mjd: " + mjd + " sv: " + flattenedStates[k].mjd);
       console.log(flattenedStates[k]);
       continue;
@@ -122,9 +128,11 @@ app.get('/persister/init', function(req, res) {
     }
     persisters[key] = vesselsToKeep;
   }
-  console.log("new states: ");
-  console.log(newStates);
+  onlinePersisters[pid] = curmjd();
   persisters[pid] = newStates;
+  console.log("POST INIT: ");
+  console.log(persisters);
+  console.log(onlinePersisters);
   res.send(pid, 200);
 });
 
@@ -140,8 +148,6 @@ app.get('/vessel/delete', function(req, res){
     while(i--) {
       var state = persister[i];
       if (state.name == vesselToDelete) {
-        console.log("deleting state: ");
-        console.log(state);
         persister.splice(i, 1);
       }
       else persisterNew.push(state);
@@ -152,6 +158,8 @@ app.get('/vessel/delete', function(req, res){
 });
 
 app.post('/persist', function(req, res){
+  console.log("persisting: ");
+  console.log(req.body);
   var persisterId;
   if (req.query.pid != null && persisters[req.query.pid] != null) {
     persisterId = req.query.pid;
@@ -174,6 +182,31 @@ app.get('/persister/all', function(req, res){
   res.send(persisters, 200);
 });
 
+function findFreePersister(exclude) {
+    // go through persister list and find a free persister
+    var foundKey = null;
+    var persisterKeys = Object.keys(persisters);
+    for (var k = 0; k < persisterKeys.length; k++) {
+      var key = persisterKeys[k];
+      if (key == exclude) continue;
+      var per = persisters[key];
+      if (per.length == 0) continue;
+      foundKey = key;
+      break;
+    }
+  return foundKey;
+}
+
+function transferStates(persister, foundKey) {
+  if (persister == null || persister.length == 0) return;
+  var oldPersisterId = persister[0].persisterId;
+  persisters[oldPersisterId] = [];
+  for (var k = 0; k < persister.length; k++) {
+    persister[k].persisterId = foundKey;
+    persisters[foundKey].push(persister[k]);
+  }
+}
+
 app.post('/persister/exit', function(req, res) {
   var pid = req.query.pid;
   // TODO move the vessels to an existing persister..
@@ -184,27 +217,16 @@ app.post('/persister/exit', function(req, res) {
       if (persister[k].originalPersister == null || typeof persister[k].originalPersister == 'undefined' || persister[k].originalPersister == '')
         persister[k].originalPersister = pid;
     }
-    // go through persister list and find a free persister
-    var foundKey = null;
-    for (var k = 0; k < persisterKeys.length; k++) {
-      var key = persisterKeys[k];
-      if (key == pid) continue;
-      var per = persisters[key];
-      if (per.length == 0) continue;
-      foundKey = key;
-      break;
-    }
+    var foundKey = findFreePersister(pid);
     if (foundKey != null) {
-      for (var k = 0; k < persister.length; k++) {
-        persister[k].persisterId = foundKey;
-        persisters[foundKey].push(persister[k]);
-      }
-      console.log("deleting persister: " + pid);
-      console.log(persisters[foundKey]);
-      console.log(persister);
-      persisters[pid] = [];
+      transferStates(persister, foundKey);
       newVessels[req.query.pid] = [];
     }
+    delete onlinePersisters.pid;
+    onlinePersisters[pid] = null;
+    console.log("online persisters post exit: ");
+    console.log(onlinePersisters);
+    console.log("this id " + pid + " should be deleted... but is still: " + onlinePersisters[pid]);
   }
   res.send({}, 200);
 });
@@ -245,12 +267,74 @@ function persisterPrune() {
     for(var j = 0; j < persister.length; j++) {
       var state = persister[j];
       var dt = (mjd - state.mjd) * 60 * 60 * 24;
-      if (dt > 5 && state.className == "Blast") continue;
+      if (dt > 5) continue;
       newPersister.push(state);
     }
     persisters[key] = newPersister;
   }
 }
+
+function onlinePersisterPrune() {
+  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
+  var persisterKeys = Object.keys(onlinePersisters);
+  newOnlinePersister = [];
+  for(var k = 0; k < persisterKeys.length; k++) {
+    var key = persisterKeys[k];
+    if (onlinePersisters[key] == null) continue;
+    var statemjd = onlinePersisters[key];
+    var dt = (mjd - statemjd) * 60 * 60 * 24;
+    if (dt > 10) continue;
+    newOnlinePersister[key] = statemjd;
+  }
+  onlinePersisters = newOnlinePersister;
+}
+
+function isPersisterOnline(persisterId) {
+  var persister = onlinePersisters[persisterId];
+  return persister != null && typeof persister != 'undefined';
+}
+
+function playerAssignmentPrune() {
+  var persisterKeys = Object.keys(persisters);
+  for (var k = 0; k < persisterKeys.length; k++) {
+    var key = persisterKeys[k];
+    var persister = persisters[key];
+    var vesselsToKeep = [];
+    if (!isPersisterOnline(key)) {
+      for (var j = 0; j < persister.length; j++) {
+        if (persister[j].originalPersister == null || typeof persister[j].originalPersister == 'undefined' || persister[j].originalPersister == '')
+          persister[j].originalPersister = key;
+      }
+      var foundKey = findFreePersister(key);
+      if (foundKey != null) {
+        transferStates(persister, foundKey);
+        newVessels[key] = [];
+      }
+      continue;
+    }
+    for (var j = 0; j < persister.length; j++) {
+      var state = persister[j];
+      if (state.originalPersister != null && typeof state.originalPersister!= 'undefined' && state.originalPersister != '' && 
+        isPersisterOnline(state.originalPersister)) {
+        console.log("persister management: originalPersister back online, assigning " + state.persisterId + " back to " + state.originalPersister);
+        console.log(onlinePersisters);
+        var dt = (curmjd() - onlinePersisters[state.originalPersister]) * 60 * 60 * 24;
+        console.log("last posttele by " + state.originalPersister + " " + dt);
+        state.persisterId = state.originalPersister;
+        delete state.originalPersister;
+        persisters[state.persisterId].push(state);
+      } else {
+        vesselsToKeep.push(state);
+      }
+    }
+    persisters[key] = vesselsToKeep;
+  }
+}
+
+app.post('/persister/set', function(req, res){
+  persisters = req.body;
+  res.send({}, 200);
+});
 
 app.post('/recon', function(req, res) {
   var copyRecon = JSON.parse(JSON.stringify(reconStates));
@@ -276,6 +360,12 @@ app.post('/dock', function(req, res) {
 });
 
 app.post('/posttele', function(req, res){
+  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
+  if (onlinePersisters[req.query.pid] == null) {
+    res.status(200);
+    return;
+  } 
+  onlinePersisters[req.query.pid] = mjd;
   var vesselsToSpawn = newVessels[req.query.pid];
   var per = persisters[req.query.pid];
 
@@ -284,7 +374,6 @@ app.post('/posttele', function(req, res){
     persisters[req.query.pid] = [];
   var persisterKeys = Object.keys(persisters);
   var newBody = [];
-  var mjd = orb.time.JDtoMJD(orb.time.dateToJD(new Date()));
   for(var k = 0; k < req.body.length; k++) {
     var state = req.body[k];
     var collision = false;
@@ -326,4 +415,6 @@ console.log("magic happens on port 5000\n");
 setInterval(reconPrune, 2000);
 setInterval(dockPrune, 2000);
 setInterval(persisterPrune, 2000);
+setInterval(onlinePersisterPrune, 2000);
+setInterval(playerAssignmentPrune, 3000);
 app.listen(5000);

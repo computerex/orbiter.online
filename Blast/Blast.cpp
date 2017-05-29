@@ -37,6 +37,7 @@ BLAST::BLAST(OBJHANDLE hVessel, int flightmodel) : VESSEL2(hVessel, flightmodel)
 	m_ExplosionTime=m_DRange;
 	isLocal = false;
 	init = false;
+	last_update = 0;
 }
 int BLAST::clbkConsumeBufferedKey(DWORD key, bool down, char *kstate)
 {
@@ -72,11 +73,12 @@ void BLAST::deleteMyself()
 	OBJHANDLE me = GetHandle();
 	oapiGetObjectName(me, name, 256);
 	if (!isLocal)
-		curl_get("http://localhost:5000/vessel/delete?name=" + string(name) + "&focus=" + oapiGetFocusInterface()->GetName());
+		curl_get("http://orbiter.world/vessel/delete?name=" + string(name) + "&focus=" + oapiGetFocusInterface()->GetName());
 	oapiDeleteVessel(me);
 }
 void BLAST::clbkPreStep(double simt, double simdt, double mjd)
 {
+	double syst = oapiGetSysTime();
 	if (!init) {
 		init = true;
 		char name[256];
@@ -98,16 +100,6 @@ void BLAST::clbkPreStep(double simt, double simdt, double mjd)
 					DefSetState(&vs);
 				}
 			}
-			ClearThrusterDefinitions();
-			PROPELLANT_HANDLE hpr = CreatePropellantResource(1);
-			THRUSTER_HANDLE    th = CreateThruster(_V(0, 0, 0), _V(0, 1, 0), 1e0, hpr, 500e50);
-			COLOUR4 col_d = { 0.9f,0.8f,1.0f,0.0f };
-			COLOUR4 col_s = { 1.9f,0.8f,1.0f,0.0f };
-			COLOUR4 col_a = { 0.0f,0.0f,0.0f,0.0f };
-			AddPointLight(_V(0, 0, 0), m_DRange * 10, 0.0, 0.0, 2e-3, col_d, col_s, col_a);
-			AddExhaust(th, 1, m_DRange / 2);
-			CreateThrusterGroup(&th, 1, THGROUP_MAIN);
-			SetThrusterGroupLevel(THGROUP_MAIN, 1);
 		}
 	}
 	double lifetime = (simt - m_CreationTime);
@@ -183,11 +175,39 @@ void BLAST::clbkPreStep(double simt, double simdt, double mjd)
 			oapiDeleteVessel(GetHandle());
 		}
 	}*/
+	if (syst > (last_update + 1)) {
+		ClearThrusterDefinitions();
+		ClearLightEmitters();
+		ClearPropellantResources();
+		ClearExhaustRefs();
+		ClearAttExhaustRefs();
+		PROPELLANT_HANDLE hpr = CreatePropellantResource(1);
+		THRUSTER_HANDLE    th = CreateThruster(_V(0, 0, -12), _V(0, 0, 1), 1e0, hpr, 500e50);
+		AddExhaust(th, 10, 2);
+		auto contrail_tex = oapiRegisterParticleTexture("Contrail1a");
+		PARTICLESTREAMSPEC contrail = {
+			0, 20.0, 50, 1000, 0.25, 15, 1, 2.0, PARTICLESTREAMSPEC::DIFFUSE,
+			PARTICLESTREAMSPEC::LVL_PSQRT, 0, 2,
+			PARTICLESTREAMSPEC::ATM_PLOG, 1e-4, 1,
+			contrail_tex
+		};
+		PARTICLESTREAMSPEC exhaust_main = {
+			0, 20.0, 50, 1000, 0.1, 5, 16, 1.0, PARTICLESTREAMSPEC::EMISSIVE,
+			PARTICLESTREAMSPEC::LVL_SQRT, 0, 1,
+			PARTICLESTREAMSPEC::ATM_PLOG, 1e-5, 0.1
+		};
+		AddExhaustStream(th, &contrail);
+		AddExhaustStream(th, &exhaust_main);
+		CreateThrusterGroup(&th, 1, THGROUP_MAIN);
+		last_update = syst + 1000;
+	}
+	SetThrusterGroupLevel(THGROUP_MAIN, 1);
 }
 void BLAST::clbkSetClassCaps(FILEHANDLE cfg)
 {
 	SetReentryTexture(NULL);
 	SetEnableFocus(false);
+	AddMesh("missile");
 }
 bool BLAST::Blow()
 {
