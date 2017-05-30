@@ -184,17 +184,13 @@ app.get('/persister/all', function(req, res){
 
 function findFreePersister(exclude) {
     // go through persister list and find a free persister
-    var foundKey = null;
-    var persisterKeys = Object.keys(persisters);
+    var persisterKeys = Object.keys(onlinePersisters);
     for (var k = 0; k < persisterKeys.length; k++) {
       var key = persisterKeys[k];
       if (key == exclude) continue;
-      var per = persisters[key];
-      if (per.length == 0) continue;
-      foundKey = key;
-      break;
+      if (onlinePersisters[key] != null) return key;
     }
-  return foundKey;
+  return null;
 }
 
 function transferStates(persister, foundKey) {
@@ -267,7 +263,7 @@ function persisterPrune() {
     for(var j = 0; j < persister.length; j++) {
       var state = persister[j];
       var dt = (mjd - state.mjd) * 60 * 60 * 24;
-      if (dt > 5) continue;
+      if (dt > 15) continue;
       newPersister.push(state);
     }
     persisters[key] = newPersister;
@@ -283,7 +279,10 @@ function onlinePersisterPrune() {
     if (onlinePersisters[key] == null) continue;
     var statemjd = onlinePersisters[key];
     var dt = (mjd - statemjd) * 60 * 60 * 24;
-    if (dt > 10) continue;
+    if (dt > 20){
+      console.log("persister " + key + " no longer online");
+      continue;
+    }
     newOnlinePersister[key] = statemjd;
   }
   onlinePersisters = newOnlinePersister;
