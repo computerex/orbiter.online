@@ -205,6 +205,8 @@ function transferStates(persister, foundKey) {
 
 app.post('/persister/exit', function(req, res) {
   var pid = req.query.pid;
+  console.log("onlinePersisters pre exit: ");
+  console.log(onlinePersisters);
   // TODO move the vessels to an existing persister..
   if (pid != null) {
     var persister = persisters[pid];
